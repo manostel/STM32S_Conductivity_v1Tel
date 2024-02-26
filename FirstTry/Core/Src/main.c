@@ -100,7 +100,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM2) {
     counter++;
     counterflagPWM=0;
-    if (counter>999)
+    if (counter>9)
     {
     	counterflagPWM=1;
 
@@ -113,13 +113,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void PWM_BEGIN(){
 
 
+	      HAL_Delay(150);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-		  HAL_Delay(300);
+		  HAL_Delay(150);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-		  HAL_Delay(100);
+		  HAL_Delay(20);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
-		  HAL_Delay(300);
+		  HAL_Delay(150);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 0);
+		  HAL_Delay(150);
 		  counterflagPWM=0;
 		  counter=0;
 
