@@ -35,8 +35,9 @@
 /* USER CODE BEGIN PD */
 #define DS18B20_PORT GPIOB
 #define DS18B20_PIN GPIO_PIN_14
-#define ADC_BUF_SIZE 3
+#define ADC_BUF_SIZE 4
 #define VREF 3310
+#define DELAY_COND 6
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,10 +52,12 @@ I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 uint32_t counter=0;
+uint8_t PWM_loop=0;
 float Temp=0;
 float Temperature=0;
 uint8_t Presence=0;
@@ -64,6 +67,7 @@ uint16_t TempInt;
 char bufferConduct[200];
 char bufferMoist[200];
 char bufferTemp[200];
+char bufferDs18b20[200];
 char bufferTempInside[200];
 char bufferVref[200];
 char bufferDS18B20[200];
@@ -93,19 +97,20 @@ static void MX_I2C1_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM3_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-  if (htim->Instance == TIM2) {
+  if (htim->Instance == TIM3) {
     counter++;
-    counterflagPWM=0;
-    if (counter>9)
+
+    if (counter>50)
     {
     	counterflagPWM=1;
 
-
     }
+
   }
 }
 
@@ -113,20 +118,24 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void PWM_BEGIN(){
 
 
-	      HAL_Delay(150);
+	for(PWM_loop=0;PWM_loop<20;PWM_loop++){
+	      HAL_Delay(DELAY_COND);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-		  HAL_Delay(150);
+		  HAL_Delay(DELAY_COND);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-		  HAL_Delay(20);
+		  HAL_Delay(2);
+
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
-		  HAL_Delay(150);
+		  HAL_Delay(DELAY_COND);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 0);
-		  HAL_Delay(150);
+		  HAL_Delay(DELAY_COND);
+
 		  counterflagPWM=0;
 		  counter=0;
-
+	}
 
 }
+
 
 void SSD1306_INITS()
 {
@@ -174,6 +183,14 @@ void Set_Pin_Input(GPIO_TypeDef *GPIOx,uint16_t GPIO_Pin)
 	GPIO_InitStruct.Pin=GPIO_Pin;
 	GPIO_InitStruct.Mode=GPIO_MODE_INPUT;
 	GPIO_InitStruct.Pull=GPIO_NOPULL;
+	HAL_GPIO_Init(GPIOx,&GPIO_InitStruct);
+}
+void Set_Pin_InputPU(GPIO_TypeDef *GPIOx,uint16_t GPIO_Pin)
+{
+	GPIO_InitTypeDef GPIO_InitStruct={0};
+	GPIO_InitStruct.Pin=GPIO_Pin;
+	GPIO_InitStruct.Mode=GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull=GPIO_PULLUP;
 	HAL_GPIO_Init(GPIOx,&GPIO_InitStruct);
 }
 uint8_t DS18B20_Start (void)
@@ -346,15 +363,19 @@ int main(void)
   MX_ADC2_Init();
   MX_TIM1_Init();
   MX_TIM4_Init();
+  MX_TIM3_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   SSD1306_INITS();
   HAL_ADC_Init(&hadc2);
   HAL_TIM_Base_Start(&htim1);
+  HAL_TIM_Base_Start(&htim2);
   HAL_TIM_Base_Start(&htim4);
-  HAL_TIM_Base_Start_IT(&htim2);
-  HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);  // Set priority and subpriority as needed
-  HAL_NVIC_EnableIRQ(TIM2_IRQn);
+//  PWM_BEGIN_MOIST();
+  HAL_TIM_Base_Start_IT(&htim3);
+  HAL_NVIC_SetPriority(TIM3_IRQn, 0, 0);  // Set priority and subpriority as needed
+  HAL_NVIC_EnableIRQ(TIM3_IRQn);
+
 
   /* USER CODE END 2 */
 
@@ -365,37 +386,43 @@ int main(void)
 
 
 
+//	  if(counterflagPWM==1)
+//	  {
+		  PWM_BEGIN();
+//	  }
 
-	  PWM_BEGIN();
 	  Temp=DS18B20_GetTemp();
 
-
+	  //CONDUCTIVITY
 	  ADC_CH1();
 	  HAL_ADC_Start(&hadc2);
-
 	  HAL_Delay(2);
 	  HAL_ADC_PollForConversion(&hadc2, 100);
 	  adc_buffer[0]=HAL_ADC_GetValue(&hadc2);
 	  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
 	  HAL_ADC_Stop(&hadc2);
 	  HAL_Delay(2);
+
+	  //MOISTURE
 	  ADC_CH2();
 	  HAL_ADC_Start(&hadc2);
-
 	  HAL_Delay(2);
 	  HAL_ADC_PollForConversion(&hadc2, 100);
 	  adc_buffer[1]=HAL_ADC_GetValue(&hadc2);
 	  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
 	  HAL_ADC_Stop(&hadc2);
+	  HAL_Delay(2);
 
+	  //NTC BOARD TEMP
 	  ADC_CH3();
 	  HAL_ADC_Start(&hadc2);
-
 	  HAL_Delay(2);
 	  HAL_ADC_PollForConversion(&hadc2, 100);
 	  adc_buffer[2]=HAL_ADC_GetValue(&hadc2);
 	  voltage_buffer[2]=adc_value_to_voltage(adc_buffer[2]);
 	  HAL_ADC_Stop(&hadc2);
+	  HAL_Delay(2);
+
 	  ssd1306_SetCursor(0, 0);
 	  sprintf(bufferConduct,"Cond %.2fV",voltage_buffer[0]);
 	  ssd1306_WriteString(bufferConduct,Font_7x10,1);
@@ -405,10 +432,13 @@ int main(void)
 	  ssd1306_SetCursor(0, 21);
 	  sprintf(bufferTemp,"Temp %.2fV",voltage_buffer[2]);
 	  ssd1306_WriteString(bufferTemp,Font_7x10,1);
+	  ssd1306_SetCursor(0, 31);
+	  sprintf(bufferDs18b20,"ds18b20 %.2fV",Temp);
+	  ssd1306_WriteString(bufferDs18b20,Font_7x10,1);
 	  ssd1306_UpdateScreen();
 
 
-	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_3);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -494,7 +524,33 @@ static void MX_ADC2_Init(void)
     Error_Handler();
   }
 
-
+//  /** Configure Regular Channel
+//  */
+//  sConfig.Channel = ADC_CHANNEL_1;
+//  sConfig.Rank = ADC_REGULAR_RANK_1;
+//  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+//
+//  /** Configure Regular Channel
+//  */
+//  sConfig.Channel = ADC_CHANNEL_2;
+//  sConfig.Rank = ADC_REGULAR_RANK_2;
+//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+//
+//  /** Configure Regular Channel
+//  */
+//  sConfig.Channel = ADC_CHANNEL_3;
+//  sConfig.Rank = ADC_REGULAR_RANK_3;
+//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
@@ -595,14 +651,15 @@ static void MX_TIM2_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM2_Init 1 */
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 7199;
+  htim2.Init.Prescaler = 287;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 10;
+  htim2.Init.Period = 30000;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -614,15 +671,73 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 7199;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 10;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
 
 }
 
@@ -691,16 +806,12 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC3 */
   GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB6 PB7 */
