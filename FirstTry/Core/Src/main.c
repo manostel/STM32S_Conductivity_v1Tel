@@ -38,6 +38,7 @@
 #define ADC_BUF_SIZE 4
 #define VREF 3310
 #define DELAY_COND 6
+#define DELAY_MOIST 1
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -57,7 +58,7 @@ TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 uint32_t counter=0;
-uint8_t PWM_loop=0;
+int32_t PWM_loop=0;
 float Temp=0;
 float Temperature=0;
 uint8_t Presence=0;
@@ -115,7 +116,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 
-void PWM_BEGIN(){
+void PWM_COND(){
 
 
 	for(PWM_loop=0;PWM_loop<20;PWM_loop++){
@@ -132,6 +133,19 @@ void PWM_BEGIN(){
 
 		  counterflagPWM=0;
 		  counter=0;
+	}
+
+}
+void PWM_MOIST(){
+
+
+	for(PWM_loop=0;PWM_loop<2500000;PWM_loop++){
+		  delay(DELAY_MOIST);
+		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 1);
+		  delay(DELAY_MOIST);
+		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 0);
+		  delay(DELAY_MOIST);
+
 	}
 
 }
@@ -385,33 +399,58 @@ int main(void)
   {
 
 
+	  //MEASURE SEQUENTIAL
+	  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
+	  {
+		  PWM_COND();
 
-//	  if(counterflagPWM==1)
-//	  {
-		  PWM_BEGIN();
-//	  }
+		  ADC_CH1();
+		  HAL_ADC_Start(&hadc2);
+		  HAL_Delay(2);
+		  HAL_ADC_PollForConversion(&hadc2, 100);
+		  adc_buffer[0]=HAL_ADC_GetValue(&hadc2);
+		  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
+		  HAL_ADC_Stop(&hadc2);
+
+		  HAL_Delay(4000);
+
+		  PWM_MOIST();
+
+		  ADC_CH2();
+		  HAL_ADC_Start(&hadc2);
+		  HAL_Delay(2);
+		  HAL_ADC_PollForConversion(&hadc2, 100);
+		  adc_buffer[1]=HAL_ADC_GetValue(&hadc2);
+		  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
+		  HAL_ADC_Stop(&hadc2);
+		  HAL_Delay(2);
+
+	  }
+
+
+
 
 	  Temp=DS18B20_GetTemp();
 
-	  //CONDUCTIVITY
-	  ADC_CH1();
-	  HAL_ADC_Start(&hadc2);
-	  HAL_Delay(2);
-	  HAL_ADC_PollForConversion(&hadc2, 100);
-	  adc_buffer[0]=HAL_ADC_GetValue(&hadc2);
-	  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
-	  HAL_ADC_Stop(&hadc2);
-	  HAL_Delay(2);
+//	  //CONDUCTIVITY
+//	  ADC_CH1();
+//	  HAL_ADC_Start(&hadc2);
+//	  HAL_Delay(2);
+//	  HAL_ADC_PollForConversion(&hadc2, 100);
+//	  adc_buffer[0]=HAL_ADC_GetValue(&hadc2);
+//	  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
+//	  HAL_ADC_Stop(&hadc2);
+//	  HAL_Delay(2);
 
-	  //MOISTURE
-	  ADC_CH2();
-	  HAL_ADC_Start(&hadc2);
-	  HAL_Delay(2);
-	  HAL_ADC_PollForConversion(&hadc2, 100);
-	  adc_buffer[1]=HAL_ADC_GetValue(&hadc2);
-	  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
-	  HAL_ADC_Stop(&hadc2);
-	  HAL_Delay(2);
+//	  //MOISTURE
+//	  ADC_CH2();
+//	  HAL_ADC_Start(&hadc2);
+//	  HAL_Delay(2);
+//	  HAL_ADC_PollForConversion(&hadc2, 100);
+//	  adc_buffer[1]=HAL_ADC_GetValue(&hadc2);
+//	  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
+//	  HAL_ADC_Stop(&hadc2);
+//	  HAL_Delay(2);
 
 	  //NTC BOARD TEMP
 	  ADC_CH3();
@@ -651,7 +690,6 @@ static void MX_TIM2_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM2_Init 1 */
 
@@ -671,28 +709,15 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
 
 }
 
@@ -806,19 +831,19 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC3 */
   GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pins : PB3 PB6 PB7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
