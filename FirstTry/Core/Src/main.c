@@ -57,8 +57,11 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
+uint8_t i=0;
 uint32_t counter=0;
 int32_t PWM_loop=0;
+float av_cond=0;
+float av_moist=0;
 float Temp=0;
 float Temperature=0;
 uint8_t Presence=0;
@@ -140,12 +143,8 @@ void PWM_MOIST(){
 
 
 	for(PWM_loop=0;PWM_loop<2500000;PWM_loop++){
-		  delay(DELAY_MOIST);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 1);
-		  delay(DELAY_MOIST);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 0);
-		  delay(DELAY_MOIST);
-
+		  __NOP();
+		  GPIOB->ODR ^= GPIO_ODR_ODR3;
 	}
 
 }
@@ -389,7 +388,8 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim3);
   HAL_NVIC_SetPriority(TIM3_IRQn, 0, 0);  // Set priority and subpriority as needed
   HAL_NVIC_EnableIRQ(TIM3_IRQn);
-
+  GPIOB->CRL &= ~(GPIO_CRL_CNF3 | GPIO_CRL_MODE3);
+  GPIOB->CRL |= GPIO_CRL_MODE3;  // Output mode, max speed 50 MHz
 
   /* USER CODE END 2 */
 
@@ -401,27 +401,34 @@ int main(void)
 
 	  //MEASURE SEQUENTIAL
 	  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
-	  {
+	  {	  av_cond=0;
+	  	  av_moist=0;
 		  PWM_COND();
 
 		  ADC_CH1();
 		  HAL_ADC_Start(&hadc2);
-		  HAL_Delay(2);
-		  HAL_ADC_PollForConversion(&hadc2, 100);
+		  for(i=0;i<50;i++)
+		  {
+		  HAL_ADC_PollForConversion(&hadc2, 1);
 		  adc_buffer[0]=HAL_ADC_GetValue(&hadc2);
 		  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
+		  av_cond+=voltage_buffer[0]/50;
+		  }
 		  HAL_ADC_Stop(&hadc2);
 
-		  HAL_Delay(4000);
+		  HAL_Delay(1000);
 
 		  PWM_MOIST();
 
 		  ADC_CH2();
 		  HAL_ADC_Start(&hadc2);
-		  HAL_Delay(2);
-		  HAL_ADC_PollForConversion(&hadc2, 100);
+		  for(i=0;i<50;i++)
+		  {
+		  HAL_ADC_PollForConversion(&hadc2, 1);
 		  adc_buffer[1]=HAL_ADC_GetValue(&hadc2);
 		  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
+		  av_moist+=voltage_buffer[1]/50;
+		  }
 		  HAL_ADC_Stop(&hadc2);
 		  HAL_Delay(2);
 
@@ -463,10 +470,10 @@ int main(void)
 	  HAL_Delay(2);
 
 	  ssd1306_SetCursor(0, 0);
-	  sprintf(bufferConduct,"Cond %.2fV",voltage_buffer[0]);
+	  sprintf(bufferConduct,"Cond %.2fV",av_cond);
 	  ssd1306_WriteString(bufferConduct,Font_7x10,1);
 	  ssd1306_SetCursor(0, 11);
-	  sprintf(bufferMoist,"Moist %.2fV",voltage_buffer[1]);
+	  sprintf(bufferMoist,"Moist %.2fV",av_moist);
 	  ssd1306_WriteString(bufferMoist,Font_7x10,1);
 	  ssd1306_SetCursor(0, 21);
 	  sprintf(bufferTemp,"Temp %.2fV",voltage_buffer[2]);
@@ -839,11 +846,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB3 PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pin : PB3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB6 PB7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
