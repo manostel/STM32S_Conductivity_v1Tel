@@ -61,6 +61,7 @@ uint8_t i=0;
 uint32_t counter=0;
 int32_t PWM_loop=0;
 float av_cond=0;
+float conductivity=0;
 float av_moist=0;
 float percentage_moist=0;
 float Temp=0;
@@ -148,6 +149,21 @@ void PWM_MOIST(){
 		  GPIOB->ODR ^= GPIO_ODR_ODR3;
 	}
 
+}
+
+float voltage_to_conductivity(float voltage) {
+    // Define the calibration points
+    float voltage_low = 3.3; // Lowest voltage
+    float conductivity_low = 0.0; // Corresponding conductivity
+
+    float voltage_high = 0.6; // Highest voltage
+    float conductivity_high = 100.0; // Corresponding conductivity
+
+    // Calculate the slope (m)
+    float slope = (conductivity_high - conductivity_low) / (voltage_high - voltage_low);
+
+    // Linear interpolation formula
+    return slope * (voltage - voltage_low) + conductivity_low;
 }
 
 
@@ -415,6 +431,7 @@ int main(void)
 		  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
 		  av_cond+=voltage_buffer[0]/50;
 		  }
+		  conductivity=voltage_to_conductivity(av_cond);
 		  HAL_ADC_Stop(&hadc2);
 
 		  HAL_Delay(1000);
@@ -472,7 +489,7 @@ int main(void)
 	  HAL_Delay(2);
 
 	  ssd1306_SetCursor(0, 0);
-	  sprintf(bufferConduct,"Cond %.2fV",av_cond);
+	  sprintf(bufferConduct,"Cond %.2fV %.f",av_cond,conductivity);
 	  ssd1306_WriteString(bufferConduct,Font_7x10,1);
 	  ssd1306_SetCursor(0, 11);
 	  sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist,percentage_moist);
