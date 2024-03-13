@@ -151,7 +151,7 @@ void PWM_MOIST(){
 
 }
 
-float voltage_to_conductivity(float voltage) {
+float voltage_to_conductivity(float voltage) { //it needs fix
     // Define the calibration points
     float voltage_low = 3.3; // Lowest voltage
     float conductivity_low = 0.0; // Corresponding conductivity
