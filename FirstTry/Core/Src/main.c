@@ -62,6 +62,7 @@ uint32_t counter=0;
 int32_t PWM_loop=0;
 float av_cond=0;
 float av_moist=0;
+float percentage_moist=0;
 float Temp=0;
 float Temperature=0;
 uint8_t Presence=0;
@@ -429,6 +430,7 @@ int main(void)
 		  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
 		  av_moist+=voltage_buffer[1]/50;
 		  }
+		  percentage_moist=(100-(av_moist/1700)*100);
 		  HAL_ADC_Stop(&hadc2);
 		  HAL_Delay(2);
 
@@ -473,7 +475,7 @@ int main(void)
 	  sprintf(bufferConduct,"Cond %.2fV",av_cond);
 	  ssd1306_WriteString(bufferConduct,Font_7x10,1);
 	  ssd1306_SetCursor(0, 11);
-	  sprintf(bufferMoist,"Moist %.2fV",av_moist);
+	  sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist,percentage_moist);
 	  ssd1306_WriteString(bufferMoist,Font_7x10,1);
 	  ssd1306_SetCursor(0, 21);
 	  sprintf(bufferTemp,"Temp %.2fV",voltage_buffer[2]);
