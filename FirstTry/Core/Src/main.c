@@ -58,12 +58,14 @@ TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 uint8_t i=0;
+uint8_t j=0;
 uint32_t counter=0;
 int32_t PWM_loop=0;
 float av_cond=0;
 float conductivity=0;
 float av_moist=0;
 float percentage_moist=0;
+float percentage_moist2=0;
 float Temp=0;
 float Temperature=0;
 uint8_t Presence=0;
@@ -111,7 +113,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM3) {
     counter++;
 
-    if (counter>50)
+    if (counter>1000)
     {
     	counterflagPWM=1;
 
@@ -136,18 +138,22 @@ void PWM_COND(){
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 0);
 		  HAL_Delay(DELAY_COND);
 
-		  counterflagPWM=0;
-		  counter=0;
+
 	}
 
 }
 void PWM_MOIST(){
 
+	  counterflagPWM=0;
+	  counter=0;
 
-	for(PWM_loop=0;PWM_loop<2500000;PWM_loop++){
-		  __NOP();
+	do
+	{
+
 		  GPIOB->ODR ^= GPIO_ODR_ODR3;
-	}
+
+	}while(counterflagPWM==0);
+
 
 }
 
@@ -420,6 +426,12 @@ int main(void)
 	  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
 	  {	  av_cond=0;
 	  	  av_moist=0;
+		  ssd1306_Fill(0);
+		  ssd1306_UpdateScreen();
+		  ssd1306_SetCursor(0, 0);
+		  ssd1306_WriteString("Conductivity...",Font_7x10,1);
+		  ssd1306_UpdateScreen();
+		  ssd1306_Fill(0);
 		  PWM_COND();
 
 		  ADC_CH1();
@@ -435,21 +447,40 @@ int main(void)
 		  HAL_ADC_Stop(&hadc2);
 
 		  HAL_Delay(1000);
-
+		  ssd1306_Fill(0);
+		  ssd1306_UpdateScreen();
+		  ssd1306_SetCursor(0, 0);
+		  ssd1306_WriteString("Moisture...",Font_7x10,1);
+		  ssd1306_UpdateScreen();
+		  ssd1306_Fill(0);
 		  PWM_MOIST();
-
 		  ADC_CH2();
-		  HAL_ADC_Start(&hadc2);
-		  for(i=0;i<50;i++)
-		  {
-		  HAL_ADC_PollForConversion(&hadc2, 1);
-		  adc_buffer[1]=HAL_ADC_GetValue(&hadc2);
-		  voltage_buffer[1]=adc_value_to_voltage(adc_buffer[1]);
-		  av_moist+=voltage_buffer[1]/50;
+
+		  percentage_moist2 = 0; // Initialize averaged percentage variable
+
+		  for (j = 0; j < 15; j++) {
+		      av_moist = 0; // Reset av_moist for each iteration
+		      percentage_moist=0;
+		      PWM_MOIST();
+		      HAL_ADC_Start(&hadc2);
+		      for (i = 0; i < 50; i++) {
+		          HAL_ADC_PollForConversion(&hadc2, 1);
+		          adc_buffer[1] = HAL_ADC_GetValue(&hadc2);
+		          voltage_buffer[1] = adc_value_to_voltage(adc_buffer[1]);
+		          av_moist += voltage_buffer[1] / 50;
+		      }
+		      HAL_ADC_Stop(&hadc2);
+
+		      // Calculate percentage_moist for this iteration
+		      percentage_moist = (100 - (av_moist / 2200) * 100);
+
+		      // Accumulate the calculated percentage
+		      percentage_moist2 += percentage_moist;
+		      HAL_Delay(2); // Add delay between measurements if necessary
 		  }
-		  percentage_moist=(100-(av_moist/1700)*100);
-		  HAL_ADC_Stop(&hadc2);
-		  HAL_Delay(2);
+
+		  // Calculate the average of percentage_moist over 5 measurements
+		  percentage_moist2 /= 15;
 
 	  }
 
@@ -492,7 +523,7 @@ int main(void)
 	  sprintf(bufferConduct,"Cond %.2fV %.f",av_cond,conductivity);
 	  ssd1306_WriteString(bufferConduct,Font_7x10,1);
 	  ssd1306_SetCursor(0, 11);
-	  sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist,percentage_moist);
+	  sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist,percentage_moist2);
 	  ssd1306_WriteString(bufferMoist,Font_7x10,1);
 	  ssd1306_SetCursor(0, 21);
 	  sprintf(bufferTemp,"Temp %.2fV",voltage_buffer[2]);
