@@ -61,6 +61,7 @@ uint8_t i=0;
 uint8_t j=0;
 uint32_t counter=0;
 int32_t PWM_loop=0;
+float final_average_cond=0;
 float av_cond=0;
 float conductivity=0;
 float av_moist=0;
@@ -154,7 +155,7 @@ void PWM_MOIST(){
 
 	}while(counterflagPWM==0);
 
-
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 0);
 }
 
 float voltage_to_conductivity(float voltage) { //it needs fix
@@ -432,19 +433,34 @@ int main(void)
 		  ssd1306_WriteString("Conductivity...",Font_7x10,1);
 		  ssd1306_UpdateScreen();
 		  ssd1306_Fill(0);
-		  PWM_COND();
+
 
 		  ADC_CH1();
-		  HAL_ADC_Start(&hadc2);
-		  for(i=0;i<50;i++)
-		  {
-		  HAL_ADC_PollForConversion(&hadc2, 1);
-		  adc_buffer[0]=HAL_ADC_GetValue(&hadc2);
-		  voltage_buffer[0]=adc_value_to_voltage(adc_buffer[0]);
-		  av_cond+=voltage_buffer[0]/50;
+
+		  float av_cond_sum = 0;
+
+		  for(int j = 0; j < 15; j++) {
+		      PWM_COND();
+		      HAL_ADC_Start(&hadc2);
+		      float av_cond = 0; // Initialize av_cond for each iteration
+
+		      for(int i = 0; i < 50; i++) {
+		          HAL_ADC_PollForConversion(&hadc2, 1);
+		          adc_buffer[0] = HAL_ADC_GetValue(&hadc2);
+		          voltage_buffer[0] = adc_value_to_voltage(adc_buffer[0]);
+		          av_cond += voltage_buffer[0] / 50; // Accumulate the value
+		      }
+
+		      HAL_ADC_Stop(&hadc2);
+		      HAL_Delay(100);
+
+		      // Add the average of this iteration to av_cond_sum
+		      av_cond_sum += av_cond;
 		  }
-		  conductivity=voltage_to_conductivity(av_cond);
-		  HAL_ADC_Stop(&hadc2);
+
+		  // Calculate the final average
+		  final_average_cond = av_cond_sum / 15;
+
 
 		  HAL_Delay(1000);
 		  ssd1306_Fill(0);
@@ -520,17 +536,17 @@ int main(void)
 	  HAL_Delay(2);
 
 	  ssd1306_SetCursor(0, 0);
-	  sprintf(bufferConduct,"Cond %.2fV %.f",av_cond,conductivity);
-	  ssd1306_WriteString(bufferConduct,Font_7x10,1);
+	  sprintf(bufferConduct,"Cond %.2fV %.f",final_average_cond,conductivity);
+	  ssd1306_WriteString(bufferConduct,Font_6x8,1);
 	  ssd1306_SetCursor(0, 11);
 	  sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist,percentage_moist2);
-	  ssd1306_WriteString(bufferMoist,Font_7x10,1);
+	  ssd1306_WriteString(bufferMoist,Font_6x8,1);
 	  ssd1306_SetCursor(0, 21);
 	  sprintf(bufferTemp,"Temp %.2fV",voltage_buffer[2]);
-	  ssd1306_WriteString(bufferTemp,Font_7x10,1);
+	  ssd1306_WriteString(bufferTemp,Font_6x8,1);
 	  ssd1306_SetCursor(0, 31);
-	  sprintf(bufferDs18b20,"ds18b20 %.2fV",Temp);
-	  ssd1306_WriteString(bufferDs18b20,Font_7x10,1);
+	  sprintf(bufferDs18b20,"ds18b20 %.2fC",Temp);
+	  ssd1306_WriteString(bufferDs18b20,Font_6x8,1);
 	  ssd1306_UpdateScreen();
 
 
