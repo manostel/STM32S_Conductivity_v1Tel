@@ -92,7 +92,7 @@ uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
 uint8_t adc_ready=0;
 uint8_t pwmflagfinished=0;
-uint8_t counterflagPWM=0;
+volatile uint8_t counterflagPWM=0;
 uint32_t cond;
 uint32_t vref_int_mv;
 uint32_t moist;
@@ -148,12 +148,140 @@ void PWM_MOIST(){
 	  counterflagPWM=0;
 	  counter=0;
 
-	do
-	{
 
-		  GPIOB->ODR ^= GPIO_ODR_ODR3;
 
-	}while(counterflagPWM==0);
+	    // Set PB3 as output
+	    GPIOB->CRL &= ~(GPIO_CRL_CNF3 | GPIO_CRL_MODE3); // Clear bits
+	    GPIOB->CRL |= GPIO_CRL_MODE3_0; // Set pin mode to general purpose output push-pull 10MHz
+//
+
+
+		do
+		{
+
+			  GPIOB->ODR ^= GPIO_ODR_ODR3;
+//			  delay(4);    // 100Khz  0.6V 100%		2.6V 0%
+//			  delay(1);    // 230Khz  0.6V 100%		2.6V 0%
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+			  __NOP();
+// 325khz
+
+
+		}while(counterflagPWM==0);
+	    // Toggle PB3 using inline assembly
+//	    __asm__ volatile (
+////	            "ldr r0, =0x40010C0C \n\t" // GPIOB ODR
+////	            "ldr r1, =1<<3 \n\t"       // Turn on PB3
+////	            "ldr r2, =0 \n\t"          // Turn off PB3
+////	            ".loop: \n\t"
+////	            "str r1, [r0] \n\t"        // Set PB3
+////	            "str r2, [r0] \n\t"        // Clear PB3
+////	            "b .loop \n\t"
+//
+////	        "ldr r0, =0x40010C0C \n\t" // GPIOB ODR
+////	        "ldr r1, =1<<3 \n\t"       // Turn on PB3
+////
+////	        "ldr r2, =0 \n\t"          // Turn off PB3
+////	        ".loop: \n\t"
+////	        "ldr r3, =counterflagPWM \n\t" // Load the address of check_variable
+////	        "ldr r3, [r3] \n\t"            // Load the value of check_variable
+////	        "cmp r3, #1 \n\t"              // Compare the value with 1
+////	        "beq .endloop \n\t"            // Branch if equal to 1
+////	        "str r1, [r0] \n\t"            // Set PB3
+////	        "str r2, [r0] \n\t"            // Clear PB3
+////	        "b .loop \n\t"
+////	        ".endloop: \n\t"
+//
+//
+//	    		"ldr r0, =0x40010C0C \n\t" // GPIOB ODR
+//	    		"ldr r1, =1<<3 \n\t"       // Turn on PB3
+//	    		"ldr r2, =0 \n\t"          // Turn off PB3
+//	    		"ldr r4, =counterflagPWM \n\t" // Load the address of counterflagPWM
+//	    		"ldr r4, [r4] \n\t"            // Load the value of counterflagPWM
+//	    		"cmp r4, #1 \n\t"              // Compare the value with 1
+//	    		"beq .endloop \n\t"            // Branch if equal to 1
+//
+//	    		// Calculate the number of cycles needed for a 50% duty cycle
+//	    		"mov r5, #5000 \n\t"  // 5000 cycles for half period at 1MHz (adjust according to your frequency)
+//
+//	    		// Loop for 50% duty cycle
+//	    		".pwmloop: \n\t"
+//	    		"str r1, [r0] \n\t"            // Set PB3 (High)
+//	    		"subs r5, #1 \n\t"             // Decrement cycle counter
+//	    		"bne .pwmloop \n\t"            // Branch if not equal to zero
+//	    		"str r2, [r0] \n\t"            // Clear PB3 (Low)
+//
+//	    		"b .loop \n\t"  // Branch back to the main loop
+//
+//	    		".endloop: \n\t"
+//	    );
+
+
+
+
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 0);
 }
@@ -293,6 +421,8 @@ uint8_t DS18B20_Read (void)
 	return value;
 }
 
+
+
 float DS18B20_GetTemp(void)
 {
     Presence = DS18B20_Start();
@@ -408,12 +538,15 @@ int main(void)
   HAL_TIM_Base_Start(&htim1);
   HAL_TIM_Base_Start(&htim2);
   HAL_TIM_Base_Start(&htim4);
+
 //  PWM_BEGIN_MOIST();
   HAL_TIM_Base_Start_IT(&htim3);
   HAL_NVIC_SetPriority(TIM3_IRQn, 0, 0);  // Set priority and subpriority as needed
   HAL_NVIC_EnableIRQ(TIM3_IRQn);
   GPIOB->CRL &= ~(GPIO_CRL_CNF3 | GPIO_CRL_MODE3);
   GPIOB->CRL |= GPIO_CRL_MODE3;  // Output mode, max speed 50 MHz
+
+
 
   /* USER CODE END 2 */
 
@@ -473,10 +606,13 @@ int main(void)
 		  ADC_CH2();
 
 		  percentage_moist2 = 0; // Initialize averaged percentage variable
-
+		  percentage_moist=0;
 		  for (j = 0; j < 15; j++) {
 		      av_moist = 0; // Reset av_moist for each iteration
-		      percentage_moist=0;
+
+		      PWM_MOIST();
+		      PWM_MOIST();
+		      PWM_MOIST();
 		      PWM_MOIST();
 		      HAL_ADC_Start(&hadc2);
 		      for (i = 0; i < 50; i++) {
@@ -488,7 +624,7 @@ int main(void)
 		      HAL_ADC_Stop(&hadc2);
 
 		      // Calculate percentage_moist for this iteration
-		      percentage_moist = (100 - (av_moist / 2200) * 100);
+		      percentage_moist = (100 - (av_moist / 1900) * 100);
 
 		      // Accumulate the calculated percentage
 		      percentage_moist2 += percentage_moist;
@@ -497,6 +633,12 @@ int main(void)
 
 		  // Calculate the average of percentage_moist over 5 measurements
 		  percentage_moist2 /= 15;
+		  // Manipulate the last value of percentage_moist2
+		  if (percentage_moist2 > 100) {
+		      percentage_moist2 = 100;
+		  } else if (percentage_moist2 < 0) {
+		      percentage_moist2 = 0;
+		  }
 
 	  }
 
@@ -542,7 +684,7 @@ int main(void)
 	  sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist,percentage_moist2);
 	  ssd1306_WriteString(bufferMoist,Font_6x8,1);
 	  ssd1306_SetCursor(0, 21);
-	  sprintf(bufferTemp,"Temp %.2fV",voltage_buffer[2]);
+	  sprintf(bufferTemp,"Temp MCU %.2fV",voltage_buffer[2]);
 	  ssd1306_WriteString(bufferTemp,Font_6x8,1);
 	  ssd1306_SetCursor(0, 31);
 	  sprintf(bufferDs18b20,"ds18b20 %.2fC",Temp);
@@ -727,7 +869,7 @@ static void MX_TIM1_Init(void)
   htim1.Init.Period = 0xffff-1;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
   {
     Error_Handler();
@@ -768,9 +910,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 287;
+  htim2.Init.Prescaler = 72-1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 30000;
+  htim2.Init.Period = 65535-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -927,6 +1069,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP; // Alternate function push-pull
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
