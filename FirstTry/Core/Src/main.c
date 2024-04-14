@@ -87,7 +87,8 @@ uint16_t tempraw=0;
 uint16_t moistureraw=0;
 uint32_t value[3]; // adc valuyes
 float temp1;//
-
+const float MIN_VOLTAGE = 1500;  // 600mV
+const float MAX_VOLTAGE = 2350;  // 2600mV
 uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
 uint8_t adc_ready=0;
@@ -113,7 +114,10 @@ static void MX_TIM2_Init(void);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM3) {
     counter++;
-
+    if (counter>65535)
+    {
+    	counter=0;
+    }
     if (counter>1000)
     {
     	counterflagPWM=1;
@@ -126,7 +130,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void PWM_COND(){
 
-
+//while(1){
 	for(PWM_loop=0;PWM_loop<20;PWM_loop++){
 	      HAL_Delay(DELAY_COND);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
@@ -141,6 +145,7 @@ void PWM_COND(){
 
 
 	}
+//}
 
 }
 void PWM_MOIST(){
@@ -571,7 +576,8 @@ int main(void)
 		  ADC_CH1();
 
 		  float av_cond_sum = 0;
-
+		  PWM_COND();
+		  PWM_COND();
 		  for(int j = 0; j < 15; j++) {
 		      PWM_COND();
 		      HAL_ADC_Start(&hadc2);
@@ -605,14 +611,12 @@ int main(void)
 		  PWM_MOIST();
 		  ADC_CH2();
 
+		  // Inside your loop
 		  percentage_moist2 = 0; // Initialize averaged percentage variable
 		  percentage_moist=0;
 		  for (j = 0; j < 15; j++) {
 		      av_moist = 0; // Reset av_moist for each iteration
-
-		      PWM_MOIST();
-		      PWM_MOIST();
-		      PWM_MOIST();
+		      percentage_moist=0;
 		      PWM_MOIST();
 		      HAL_ADC_Start(&hadc2);
 		      for (i = 0; i < 50; i++) {
@@ -620,18 +624,19 @@ int main(void)
 		          adc_buffer[1] = HAL_ADC_GetValue(&hadc2);
 		          voltage_buffer[1] = adc_value_to_voltage(adc_buffer[1]);
 		          av_moist += voltage_buffer[1] / 50;
+		          percentage_moist = 100.0-(((av_moist - MIN_VOLTAGE) / (MAX_VOLTAGE - MIN_VOLTAGE)) * 100.0);
 		      }
 		      HAL_ADC_Stop(&hadc2);
 
 		      // Calculate percentage_moist for this iteration
-		      percentage_moist = (100 - (av_moist / 1900) * 100);
+
 
 		      // Accumulate the calculated percentage
 		      percentage_moist2 += percentage_moist;
 		      HAL_Delay(2); // Add delay between measurements if necessary
 		  }
 
-		  // Calculate the average of percentage_moist over 5 measurements
+		  // Calculate the average of percentage_moist over 15 measurements
 		  percentage_moist2 /= 15;
 		  // Manipulate the last value of percentage_moist2
 		  if (percentage_moist2 > 100) {
