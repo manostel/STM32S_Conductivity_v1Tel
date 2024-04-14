@@ -87,13 +87,15 @@ uint16_t tempraw=0;
 uint16_t moistureraw=0;
 uint32_t value[3]; // adc valuyes
 float temp1;//
-const float MIN_VOLTAGE = 1500;  // 600mV
+const float MIN_VOLTAGE = 1550;  // 600mV
 const float MAX_VOLTAGE = 2350;  // 2600mV
 uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
 uint8_t adc_ready=0;
 uint8_t pwmflagfinished=0;
 volatile uint8_t counterflagPWM=0;
+volatile uint8_t counterflagPWM2=0;
+
 uint32_t cond;
 uint32_t vref_int_mv;
 uint32_t moist;
@@ -123,6 +125,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     	counterflagPWM=1;
 
     }
+    if (counter>3000)
+    {
+    	counterflagPWM2=1;
+    }
 
   }
 }
@@ -131,7 +137,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void PWM_COND(){
 
 //while(1){
-	for(PWM_loop=0;PWM_loop<20;PWM_loop++){
+	for(PWM_loop=0;PWM_loop<50;PWM_loop++){
 	      HAL_Delay(DELAY_COND);
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
 		  HAL_Delay(DELAY_COND);
@@ -150,7 +156,7 @@ void PWM_COND(){
 }
 void PWM_MOIST(){
 
-	  counterflagPWM=0;
+	  counterflagPWM2=0;
 	  counter=0;
 
 
@@ -161,9 +167,8 @@ void PWM_MOIST(){
 //
 
 
-		do
-		{
 
+	    do{
 			  GPIOB->ODR ^= GPIO_ODR_ODR3;
 //			  delay(4);    // 100Khz  0.6V 100%		2.6V 0%
 //			  delay(1);    // 230Khz  0.6V 100%		2.6V 0%
@@ -235,7 +240,7 @@ void PWM_MOIST(){
 // 325khz
 
 
-		}while(counterflagPWM==0);
+		}while(counterflagPWM2==0);
 	    // Toggle PB3 using inline assembly
 //	    __asm__ volatile (
 ////	            "ldr r0, =0x40010C0C \n\t" // GPIOB ODR
@@ -609,12 +614,15 @@ int main(void)
 		  ssd1306_UpdateScreen();
 		  ssd1306_Fill(0);
 		  PWM_MOIST();
+		  PWM_MOIST();
+		  PWM_MOIST();
+		  PWM_MOIST();
 		  ADC_CH2();
 
 		  // Inside your loop
 		  percentage_moist2 = 0; // Initialize averaged percentage variable
-		  percentage_moist=0;
-		  for (j = 0; j < 15; j++) {
+
+		  for (j = 0; j < 2; j++) {
 		      av_moist = 0; // Reset av_moist for each iteration
 		      percentage_moist=0;
 		      PWM_MOIST();
@@ -633,11 +641,11 @@ int main(void)
 
 		      // Accumulate the calculated percentage
 		      percentage_moist2 += percentage_moist;
-		      HAL_Delay(2); // Add delay between measurements if necessary
+
 		  }
 
 		  // Calculate the average of percentage_moist over 15 measurements
-		  percentage_moist2 /= 15;
+		  percentage_moist2 /= 2;
 		  // Manipulate the last value of percentage_moist2
 		  if (percentage_moist2 > 100) {
 		      percentage_moist2 = 100;
