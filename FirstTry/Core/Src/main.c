@@ -96,7 +96,7 @@ uint16_t tempraw=0;
 uint16_t moistureraw=0;
 uint32_t value[3]; // adc valuyes
 float temp1;//
-const float MIN_VOLTAGE = 1050;
+const float MIN_VOLTAGE = 1550;
 const float MAX_VOLTAGE = 2300;
 uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
@@ -269,19 +269,35 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void PWM_COND() {
 	if(counterFREQ==0)
 	{
-		PWM_loop=10;
+		PWM_loop=5;
 	}
 	if(counterFREQ==1)
 	{
-		PWM_loop=100;
+		PWM_loop=20;
 	}
 	if(counterFREQ==2)
 	{
-		PWM_loop=100;
+		PWM_loop=20;
 	}
 	if(counterFREQ==3)
 	{
-		PWM_loop=1000;
+		PWM_loop=50;
+	}
+	if(counterFREQ==4)
+	{
+		PWM_loop=100;
+	}
+	if(counterFREQ==5)
+	{
+		PWM_loop=100;
+	}
+	if(counterFREQ==6)
+	{
+		PWM_loop=100;
+	}
+	if(counterFREQ==7)
+	{
+		PWM_loop=100;
 	}
 
 
@@ -295,11 +311,11 @@ void PWM_COND() {
         delay2(delay_band);
 
         // Toggle GPIOB Pin 6
-        delay2(delay_time);
+//        delay2(delay_time);
         GPIOB->BSRR = GPIO_PIN_7; // Set Pin 6 (output high)
         delay2(delay_time); // Adjust delay time as needed
         GPIOB->BSRR = GPIO_PIN_7 << 16; // Reset Pin 6 (output low)
-
+        delay2(delay_time);
 
 
 
@@ -748,10 +764,26 @@ int main(void)
 		    delay_band = 10; // Initial delay band in microseconds
 	  }
 	  if(counterFREQ==3){
-		    delay_time = 20; // Initial delay time in microseconds
+		    delay_time = 100; // Initial delay time in microseconds
+		    delay_band = 5; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ==4){
+		    delay_time = 50; // Initial delay time in microseconds
+		    delay_band = 2; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ==5){
+		    delay_time = 25; // Initial delay time in microseconds
 		    delay_band = 1; // Initial delay band in microseconds
 	  }
-	  if(counterFREQ>3){
+	  if(counterFREQ==6){
+		    delay_time = 12; // Initial delay time in microseconds
+		    delay_band = 1; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ==7){
+		    delay_time = 6; // Initial delay time in microseconds
+		    delay_band = 1; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ>7){
 		  counterFREQ=0;
 	  }
 	  //MEASURE SEQUENTIAL
@@ -795,8 +827,14 @@ int main(void)
 		  // Calculate the final average
 		  final_average_cond = av_cond_sum / 15;
 
-
-		  HAL_Delay(1000);
+		  ssd1306_Fill(0);
+		  ssd1306_UpdateScreen();
+		  ssd1306_SetCursor(0, 0);
+		  ssd1306_WriteString("Preparing next ",Font_7x10,1);
+		  ssd1306_SetCursor(0,10);
+		  ssd1306_WriteString("measurement...",Font_7x10,1);
+		  ssd1306_UpdateScreen();
+		  HAL_Delay(4000);
 		  ssd1306_Fill(0);
 		  ssd1306_UpdateScreen();
 		  ssd1306_SetCursor(0, 0);
@@ -926,22 +964,42 @@ int main(void)
 	  }
 	  if (counterFREQ==0){
 	  ssd1306_SetCursor(0,51);
-	  sprintf(bufferFREQ,"Frequency: 70Hz   ");
+	  sprintf(bufferFREQ,"Frequency:0 100Hz   ");
 	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 	  }
 	  if (counterFREQ==1){
 	  ssd1306_SetCursor(0,51);
-	  sprintf(bufferFREQ,"Frequency: 700Hz  ");
+	  sprintf(bufferFREQ,"Frequency:1 1KHz  ");
 	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 	  }
 	  if (counterFREQ==2){
 	  ssd1306_SetCursor(0,51);
-	  sprintf(bufferFREQ,"Frequency: 7KHz  ");
+	  sprintf(bufferFREQ,"Frequency:2 6KHz  ");
 	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 	  }
 	  if (counterFREQ==3){
 	  ssd1306_SetCursor(0,51);
-	  sprintf(bufferFREQ,"Frequency: 70KHz  ");
+	  sprintf(bufferFREQ,"Frequency:3 20KHz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==4){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency:4 40KHz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==5){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency:5 75KHz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==6){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency:6 133KHz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==7){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency:7 200KHz  ");
 	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 	  }
 	  ssd1306_UpdateScreen();
