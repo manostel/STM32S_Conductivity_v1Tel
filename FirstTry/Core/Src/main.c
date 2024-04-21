@@ -277,11 +277,11 @@ void PWM_COND() {
 	}
 	if(counterFREQ==2)
 	{
-		PWM_loop=1000;
+		PWM_loop=100;
 	}
 	if(counterFREQ==3)
 	{
-		PWM_loop=10000;
+		PWM_loop=1000;
 	}
 
 
