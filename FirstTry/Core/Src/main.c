@@ -57,9 +57,12 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
+uint32_t delay_time = 20000; // Initial delay time in microseconds
+uint32_t delay_band = 1000; // Initial delay band in microseconds
 uint8_t i=0;
 uint8_t j=0;
 uint32_t counter=0;
+uint16_t counterFREQ=0;
 int32_t PWM_loop=0;
 float final_average_cond=0;
 float av_cond=0;
@@ -73,6 +76,7 @@ uint8_t Presence=0;
 uint8_t Temp_byte1,Temp_byte2;
 uint16_t TEMP =0;;
 uint16_t TempInt;
+
 char bufferConduct[200];
 char bufferMoist[200];
 char bufferTemp[200];
@@ -80,6 +84,11 @@ char bufferDs18b20[200];
 char bufferTempInside[200];
 char bufferVref[200];
 char bufferDS18B20[200];
+char bufferSET1[200];
+char bufferSET10[200];
+char bufferSET100[200];
+char bufferSET1000[200];
+char bufferFREQ[200];
 char adcbuffer1[20];
 char adcbuffer2[20];
 uint16_t conductraw=0;
@@ -87,8 +96,8 @@ uint16_t tempraw=0;
 uint16_t moistureraw=0;
 uint32_t value[3]; // adc valuyes
 float temp1;//
-const float MIN_VOLTAGE = 1550;  // 600mV
-const float MAX_VOLTAGE = 2350;  // 2600mV
+const float MIN_VOLTAGE = 1050;
+const float MAX_VOLTAGE = 2300;
 uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
 uint8_t adc_ready=0;
@@ -134,26 +143,169 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 }
 
 
-void PWM_COND(){
-
-//while(1){
-	for(PWM_loop=0;PWM_loop<50;PWM_loop++){
-	      HAL_Delay(DELAY_COND);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-		  HAL_Delay(DELAY_COND);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-		  HAL_Delay(2);
-
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
-		  HAL_Delay(DELAY_COND);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 0);
-		  HAL_Delay(DELAY_COND);
-
-
-	}
+//void PWM_COND(){
+//
+////while(1){
+//	for(PWM_loop=0;PWM_loop<2000;PWM_loop++){
+////	      HAL_Delay(DELAY_COND);
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//		__NOP();
+//
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+////		  HAL_Delay(DELAY_COND);
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//			__NOP();
+//
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
+////		  HAL_Delay(2);
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//
+//		  __NOP();
+//		  __NOP();
+//
+//
+//
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
+////		  HAL_Delay(DELAY_COND);
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//
+//		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 0);
+////		  HAL_Delay(DELAY_COND);
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//		  __NOP();
+//
+//
+//
+//	}
+////}
+//
 //}
 
+//void PWM_COND() {
+//    for (volatile uint32_t PWM_loop = 0; PWM_loop < 2000; ++PWM_loop) {
+//        // Toggle GPIOB Pin 7
+//    	delay2(200);
+//        GPIOB->BSRR = GPIO_PIN_6; // Set Pin 7 (output high)
+//        delay2(300); // Adjust delay time as needed
+//        GPIOB->BSRR = GPIO_PIN_6 << 16; // Reset Pin 7 (output low)
+//        delay2(50);
+//        // Toggle GPIOB Pin 6
+//        GPIOB->BSRR = GPIO_PIN_7; // Set Pin 6 (output high)
+//        delay2(300); // Adjust delay time as needed
+//        GPIOB->BSRR = GPIO_PIN_7 << 16; // Reset Pin 6 (output low)
+//        delay2(200);
+//    }
+//}
+
+
+void PWM_COND() {
+	if(counterFREQ==0)
+	{
+		PWM_loop=10;
+	}
+	if(counterFREQ==1)
+	{
+		PWM_loop=100;
+	}
+	if(counterFREQ==2)
+	{
+		PWM_loop=1000;
+	}
+	if(counterFREQ==3)
+	{
+		PWM_loop=10000;
+	}
+
+
+    for(i=0;i<PWM_loop;i++){
+        // Toggle GPIOB Pin 7
+        delay2(delay_time);
+        GPIOB->BSRR = GPIO_PIN_6; // Set Pin 7 (output high)
+        delay2(delay_time); // Adjust delay time as needed
+        GPIOB->BSRR = GPIO_PIN_6 << 16; // Reset Pin 7 (output low)
+
+        delay2(delay_band);
+
+        // Toggle GPIOB Pin 6
+        delay2(delay_time);
+        GPIOB->BSRR = GPIO_PIN_7; // Set Pin 6 (output high)
+        delay2(delay_time); // Adjust delay time as needed
+        GPIOB->BSRR = GPIO_PIN_7 << 16; // Reset Pin 6 (output low)
+
+
+
+
+    }
 }
+//}
 void PWM_MOIST(){
 
 	  counterflagPWM2=0;
@@ -368,6 +520,14 @@ void Set_Pin_InputPU(GPIO_TypeDef *GPIOx,uint16_t GPIO_Pin)
 	GPIO_InitStruct.Pull=GPIO_PULLUP;
 	HAL_GPIO_Init(GPIOx,&GPIO_InitStruct);
 }
+void Set_Pin_InputPD(GPIO_TypeDef *GPIOx,uint16_t GPIO_Pin)
+{
+	GPIO_InitTypeDef GPIO_InitStruct={0};
+	GPIO_InitStruct.Pin=GPIO_Pin;
+	GPIO_InitStruct.Mode=GPIO_MODE_INPUT;
+	GPIO_InitStruct.Pull=GPIO_PULLDOWN;
+	HAL_GPIO_Init(GPIOx,&GPIO_InitStruct);
+}
 uint8_t DS18B20_Start (void)
 {
 	uint8_t Response=0;
@@ -500,6 +660,12 @@ float adc_value_to_voltage(uint16_t adc_value) {
     return (adc_value / 4095.0) * VREF; // 4095 for 12-bit resolution
 }
 
+void delay2(uint32_t delay_time) {
+    for (uint32_t i = 0; i < delay_time; ++i) {
+        __NOP(); // Use NOP instruction for delay
+    }
+}
+
 
 /* USER CODE END PFP */
 
@@ -555,7 +721,10 @@ int main(void)
   HAL_NVIC_EnableIRQ(TIM3_IRQn);
   GPIOB->CRL &= ~(GPIO_CRL_CNF3 | GPIO_CRL_MODE3);
   GPIOB->CRL |= GPIO_CRL_MODE3;  // Output mode, max speed 50 MHz
-
+  GPIOB->CRL &= ~(GPIO_CRL_MODE7 | GPIO_CRL_CNF7); // Pin 7
+  GPIOB->CRL |= GPIO_CRL_MODE7_0; // Output mode, max speed 10 MHz
+  GPIOB->CRL &= ~(GPIO_CRL_MODE6 | GPIO_CRL_CNF6); // Pin 6
+  GPIOB->CRL |= GPIO_CRL_MODE6_0; // Output mode, max speed 10 MHz
 
 
   /* USER CODE END 2 */
@@ -565,7 +734,26 @@ int main(void)
   while (1)
   {
 
-
+	  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2)==1)
+	  {
+		  HAL_Delay(100);
+		  counterFREQ++;
+	  }
+	  if(counterFREQ==1){
+		    delay_time = 2000; // Initial delay time in microseconds
+		    delay_band = 100; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ==2){
+		    delay_time = 200; // Initial delay time in microseconds
+		    delay_band = 10; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ==3){
+		    delay_time = 20; // Initial delay time in microseconds
+		    delay_band = 1; // Initial delay band in microseconds
+	  }
+	  if(counterFREQ>3){
+		  counterFREQ=0;
+	  }
 	  //MEASURE SEQUENTIAL
 	  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
 	  {	  av_cond=0;
@@ -581,22 +769,24 @@ int main(void)
 		  ADC_CH1();
 
 		  float av_cond_sum = 0;
-		  PWM_COND();
-		  PWM_COND();
+
 		  for(int j = 0; j < 15; j++) {
-		      PWM_COND();
+
 		      HAL_ADC_Start(&hadc2);
 		      float av_cond = 0; // Initialize av_cond for each iteration
 
-		      for(int i = 0; i < 50; i++) {
+		      for(int i = 0; i < 5; i++) {
+		    	  PWM_COND();
 		          HAL_ADC_PollForConversion(&hadc2, 1);
 		          adc_buffer[0] = HAL_ADC_GetValue(&hadc2);
 		          voltage_buffer[0] = adc_value_to_voltage(adc_buffer[0]);
-		          av_cond += voltage_buffer[0] / 50; // Accumulate the value
+		          av_cond += voltage_buffer[0] / 5; // Accumulate the value
 		      }
 
 		      HAL_ADC_Stop(&hadc2);
 		      HAL_Delay(100);
+
+
 
 		      // Add the average of this iteration to av_cond_sum
 		      av_cond_sum += av_cond;
@@ -622,7 +812,7 @@ int main(void)
 		  // Inside your loop
 		  percentage_moist2 = 0; // Initialize averaged percentage variable
 
-		  for (j = 0; j < 2; j++) {
+		  for (j = 0; j < 4; j++) {
 		      av_moist = 0; // Reset av_moist for each iteration
 		      percentage_moist=0;
 		      PWM_MOIST();
@@ -645,7 +835,7 @@ int main(void)
 		  }
 
 		  // Calculate the average of percentage_moist over 15 measurements
-		  percentage_moist2 /= 2;
+		  percentage_moist2 /= 4;
 		  // Manipulate the last value of percentage_moist2
 		  if (percentage_moist2 > 100) {
 		      percentage_moist2 = 100;
@@ -690,6 +880,10 @@ int main(void)
 	  HAL_ADC_Stop(&hadc2);
 	  HAL_Delay(2);
 
+
+
+
+
 	  ssd1306_SetCursor(0, 0);
 	  sprintf(bufferConduct,"Cond %.2fV %.f",final_average_cond,conductivity);
 	  ssd1306_WriteString(bufferConduct,Font_6x8,1);
@@ -702,6 +896,54 @@ int main(void)
 	  ssd1306_SetCursor(0, 31);
 	  sprintf(bufferDs18b20,"ds18b20 %.2fC",Temp);
 	  ssd1306_WriteString(bufferDs18b20,Font_6x8,1);
+
+	  if (HAL_GPIO_ReadPin(SET_1_GPIO_Port, SET_1_Pin) == 1) {
+		  ssd1306_SetCursor(0, 41);
+	      sprintf(bufferSET1, "SET = x1     ");
+	      ssd1306_WriteString(bufferSET1, Font_6x8, 1);
+
+	  }
+
+	  if (HAL_GPIO_ReadPin(SET_10_GPIO_Port, SET_10_Pin) == 1) {
+		  ssd1306_SetCursor(0, 41);
+	      sprintf(bufferSET10, "SET = x10     ");
+	      ssd1306_WriteString(bufferSET10, Font_6x8, 1);
+
+	  }
+
+	  if (HAL_GPIO_ReadPin(SET_100_GPIO_Port, SET_100_Pin) == 1) {
+		  ssd1306_SetCursor(0, 41);
+	      sprintf(bufferSET100, "SET = x100     ");
+	      ssd1306_WriteString(bufferSET100, Font_6x8, 1);
+
+	  }
+
+	  if (HAL_GPIO_ReadPin(SET_1000_GPIO_Port, SET_1000_Pin) == 1) {
+		  ssd1306_SetCursor(0, 41);
+	      sprintf(bufferSET1000, "SET = x1000     ");
+	      ssd1306_WriteString(bufferSET1000, Font_6x8, 1);
+
+	  }
+	  if (counterFREQ==0){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency: 70Hz   ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==1){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency: 700Hz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==2){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency: 7KHz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
+	  if (counterFREQ==3){
+	  ssd1306_SetCursor(0,51);
+	  sprintf(bufferFREQ,"Frequency: 70KHz  ");
+	  ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+	  }
 	  ssd1306_UpdateScreen();
 
 
@@ -1061,11 +1303,17 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PC3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  /*Configure GPIO pins : PC2 PC3 SET_1_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3|SET_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SET_1000_Pin SET_100_Pin SET_10_Pin */
+  GPIO_InitStruct.Pin = SET_1000_Pin|SET_100_Pin|SET_10_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB3 */
   GPIO_InitStruct.Pin = GPIO_PIN_3;
