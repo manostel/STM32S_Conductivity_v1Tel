@@ -91,6 +91,10 @@ char bufferSET1000[200];
 char bufferFREQ[200];
 char adcbuffer1[20];
 char adcbuffer2[20];
+uint8_t SET1=0;
+uint8_t SET10=0;
+uint8_t SET100=0;
+uint8_t SET1000=0;
 uint16_t conductraw=0;
 uint16_t tempraw=0;
 uint16_t moistureraw=0;
@@ -129,7 +133,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     {
     	counter=0;
     }
-    if (counter>1000)
+    if (counter>30)
     {
     	counterflagPWM=1;
 
@@ -267,59 +271,75 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 
 void PWM_COND() {
-	if(counterFREQ==0)
-	{
-		PWM_loop=5;
-	}
-	if(counterFREQ==1)
-	{
-		PWM_loop=20;
-	}
-	if(counterFREQ==2)
-	{
-		PWM_loop=20;
-	}
-	if(counterFREQ==3)
-	{
-		PWM_loop=50;
-	}
-	if(counterFREQ==4)
-	{
-		PWM_loop=100;
-	}
-	if(counterFREQ==5)
-	{
-		PWM_loop=100;
-	}
-	if(counterFREQ==6)
-	{
-		PWM_loop=100;
-	}
-	if(counterFREQ==7)
-	{
-		PWM_loop=100;
-	}
+//	if(counterFREQ==0)
+//	{
+//		PWM_loop=5;
+//	}
+//	if(counterFREQ==1)
+//	{
+//		PWM_loop=20;
+//	}
+//	if(counterFREQ==2)
+//	{
+//		PWM_loop=20;
+//	}
+//	if(counterFREQ==3)
+//	{
+//		PWM_loop=50;
+//	}
+//	if(counterFREQ==4)
+//	{
+//		PWM_loop=100;
+//	}
+//	if(counterFREQ==5)
+//	{
+//		PWM_loop=100;
+//	}
+//	if(counterFREQ==6)
+//	{
+//		PWM_loop=100;
+//	}
+//	if(counterFREQ==7)
+//	{
+//		PWM_loop=100;
+//	}
+	counterflagPWM=0;
+	counter=0;
+	do{
+    delay2(delay_time);
+    GPIOB->BSRR = GPIO_PIN_6; // Set Pin 7 (output high)
+    delay2(delay_time); // Adjust delay time as needed
+    GPIOB->BSRR = GPIO_PIN_6 << 16; // Reset Pin 7 (output low)
 
+    delay2(delay_band);
 
-    for(i=0;i<PWM_loop;i++){
-        // Toggle GPIOB Pin 7
-        delay2(delay_time);
-        GPIOB->BSRR = GPIO_PIN_6; // Set Pin 7 (output high)
-        delay2(delay_time); // Adjust delay time as needed
-        GPIOB->BSRR = GPIO_PIN_6 << 16; // Reset Pin 7 (output low)
-
-        delay2(delay_band);
-
-        // Toggle GPIOB Pin 6
+    // Toggle GPIOB Pin 6
 //        delay2(delay_time);
-        GPIOB->BSRR = GPIO_PIN_7; // Set Pin 6 (output high)
-        delay2(delay_time); // Adjust delay time as needed
-        GPIOB->BSRR = GPIO_PIN_7 << 16; // Reset Pin 6 (output low)
-        delay2(delay_time);
+    GPIOB->BSRR = GPIO_PIN_7; // Set Pin 6 (output high)
+    delay2(delay_time); // Adjust delay time as needed
+    GPIOB->BSRR = GPIO_PIN_7 << 16; // Reset Pin 6 (output low)
+    delay2(delay_time);
+	}while(counterflagPWM==0);
 
-
-
-    }
+//    for(i=0;i<PWM_loop;i++){
+//        // Toggle GPIOB Pin 7
+//        delay2(delay_time);
+//        GPIOB->BSRR = GPIO_PIN_6; // Set Pin 7 (output high)
+//        delay2(delay_time); // Adjust delay time as needed
+//        GPIOB->BSRR = GPIO_PIN_6 << 16; // Reset Pin 7 (output low)
+//
+//        delay2(delay_band);
+//
+//        // Toggle GPIOB Pin 6
+////        delay2(delay_time);
+//        GPIOB->BSRR = GPIO_PIN_7; // Set Pin 6 (output high)
+//        delay2(delay_time); // Adjust delay time as needed
+//        GPIOB->BSRR = GPIO_PIN_7 << 16; // Reset Pin 6 (output low)
+//        delay2(delay_time);
+//
+//
+//
+//    }
 }
 //}
 void PWM_MOIST(){
@@ -799,20 +819,29 @@ int main(void)
 
 
 		  ADC_CH1();
+		  for(int i=0;i<50;i++)
+		  {
+			  PWM_COND();
+		  }
+
+
 
 		  float av_cond_sum = 0;
 
 		  for(int j = 0; j < 15; j++) {
 
 		      HAL_ADC_Start(&hadc2);
+		      PWM_COND();
 		      float av_cond = 0; // Initialize av_cond for each iteration
 
-		      for(int i = 0; i < 5; i++) {
+		      for(int i = 0; i < 30; i++) {
+
 		    	  PWM_COND();
 		          HAL_ADC_PollForConversion(&hadc2, 1);
 		          adc_buffer[0] = HAL_ADC_GetValue(&hadc2);
 		          voltage_buffer[0] = adc_value_to_voltage(adc_buffer[0]);
-		          av_cond += voltage_buffer[0] / 5; // Accumulate the value
+		          av_cond += voltage_buffer[0] / 30; // Accumulate the value
+
 		      }
 
 		      HAL_ADC_Stop(&hadc2);
@@ -826,6 +855,97 @@ int main(void)
 
 		  // Calculate the final average
 		  final_average_cond = av_cond_sum / 15;
+
+		  if((final_average_cond>=3200)&& (SET1==1))
+		  {
+			  for(int i=0;i<5;i++){
+			  ssd1306_Fill(0);
+			  ssd1306_UpdateScreen();
+			  ssd1306_SetCursor(0, 0);
+			  ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+			  ssd1306_SetCursor(0,10);
+			  ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
+			  ssd1306_UpdateScreen();
+			  HAL_Delay(1000);
+			  }
+			  //out of range
+			  //decrease sensitivity
+		  }
+		  if((final_average_cond>=3200)&& (SET10==1))
+		  {
+			  for(int i=0;i<5;i++){
+			  ssd1306_Fill(0);
+			  ssd1306_UpdateScreen();
+			  ssd1306_SetCursor(0, 0);
+			  ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+			  ssd1306_SetCursor(0,10);
+			  ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
+			  ssd1306_UpdateScreen();
+			  HAL_Delay(1000);
+			  }
+			  //out of range
+			  //decrease sensitivity
+		  }
+		  if((final_average_cond>=3200)&& (SET100==1))
+		  {
+			  for(int i=0;i<5;i++){
+			  ssd1306_Fill(0);
+			  ssd1306_UpdateScreen();
+			  ssd1306_SetCursor(0, 0);
+			  ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+			  ssd1306_SetCursor(0,10);
+			  ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
+			  ssd1306_UpdateScreen();
+			  HAL_Delay(1000);
+			  }
+			  //out of range
+			  //decrease sensitivity
+		  }
+		  if((final_average_cond<=550) && (SET1000==1))
+		  {
+			  for(int i=0;i<5;i++){
+			  ssd1306_Fill(0);
+			  ssd1306_UpdateScreen();
+			  ssd1306_SetCursor(0, 0);
+			  ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+			  ssd1306_SetCursor(0,10);
+			  ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
+			  ssd1306_UpdateScreen();
+			  HAL_Delay(1000);
+			  }
+			  //out of range
+			  //increase sensitivity
+		  }
+		  if((final_average_cond<=550) && (SET100==1))
+		  {
+			  for(int i=0;i<5;i++){
+			  ssd1306_Fill(0);
+			  ssd1306_UpdateScreen();
+			  ssd1306_SetCursor(0, 0);
+			  ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+			  ssd1306_SetCursor(0,10);
+			  ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
+			  ssd1306_UpdateScreen();
+			  HAL_Delay(1000);
+			  }
+			  //out of range
+			  //increase sensitivity
+		  }
+		  if((final_average_cond<=550) && (SET10==1))
+		  {
+			  for(int i=0;i<5;i++){
+			  ssd1306_Fill(0);
+			  ssd1306_UpdateScreen();
+			  ssd1306_SetCursor(0, 0);
+			  ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+			  ssd1306_SetCursor(0,10);
+			  ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
+			  ssd1306_UpdateScreen();
+			  HAL_Delay(1000);
+			  }
+			  //out of range
+			  //increase sensitivity
+		  }
 
 		  ssd1306_Fill(0);
 		  ssd1306_UpdateScreen();
@@ -936,6 +1056,10 @@ int main(void)
 	  ssd1306_WriteString(bufferDs18b20,Font_6x8,1);
 
 	  if (HAL_GPIO_ReadPin(SET_1_GPIO_Port, SET_1_Pin) == 1) {
+		  SET1=1;
+		  SET10=0;
+		  SET100=0;
+		  SET1000=0;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET1, "SET = x1     ");
 	      ssd1306_WriteString(bufferSET1, Font_6x8, 1);
@@ -943,6 +1067,10 @@ int main(void)
 	  }
 
 	  if (HAL_GPIO_ReadPin(SET_10_GPIO_Port, SET_10_Pin) == 1) {
+		  SET1=0;
+		  SET10=1;
+		  SET100=0;
+		  SET1000=0;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET10, "SET = x10     ");
 	      ssd1306_WriteString(bufferSET10, Font_6x8, 1);
@@ -950,6 +1078,10 @@ int main(void)
 	  }
 
 	  if (HAL_GPIO_ReadPin(SET_100_GPIO_Port, SET_100_Pin) == 1) {
+		  SET1=0;
+		  SET10=0;
+		  SET100=1;
+		  SET1000=0;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET100, "SET = x100     ");
 	      ssd1306_WriteString(bufferSET100, Font_6x8, 1);
@@ -957,6 +1089,10 @@ int main(void)
 	  }
 
 	  if (HAL_GPIO_ReadPin(SET_1000_GPIO_Port, SET_1000_Pin) == 1) {
+		  SET1=0;
+		  SET10=0;
+		  SET100=0;
+		  SET1000=1;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET1000, "SET = x1000     ");
 	      ssd1306_WriteString(bufferSET1000, Font_6x8, 1);
