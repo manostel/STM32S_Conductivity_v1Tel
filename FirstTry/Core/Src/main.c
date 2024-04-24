@@ -703,6 +703,7 @@ int main(void)
 	  if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
 	  {	  av_cond=0;
 	  	  av_moist=0;
+	  	  final_average_cond=0;
 		  ssd1306_Fill(0);
 		  ssd1306_UpdateScreen();
 		  ssd1306_SetCursor(0, 0);
