@@ -2375,7 +2375,7 @@ void EC_out_of_range()
  80016ec:	b580      	push	{r7, lr}
  80016ee:	b086      	sub	sp, #24
  80016f0:	af00      	add	r7, sp, #0
-	  if((final_average_cond>=3200)&& (SET1==1))
+	  if((final_average_cond>=3100)&& (SET1==1))
  80016f2:	4ba1      	ldr	r3, [pc, #644]	; (8001978 <EC_out_of_range+0x28c>)
  80016f4:	681b      	ldr	r3, [r3, #0]
  80016f6:	49a1      	ldr	r1, [pc, #644]	; (800197c <EC_out_of_range+0x290>)
@@ -2434,7 +2434,7 @@ void EC_out_of_range()
 		  //out of range
 		  //decrease sensitivity
 	  }
-	  if((final_average_cond>=3200)&& (SET10==1))
+	  if((final_average_cond>=3100)&& (SET10==1))
  800175c:	4b86      	ldr	r3, [pc, #536]	; (8001978 <EC_out_of_range+0x28c>)
  800175e:	681b      	ldr	r3, [r3, #0]
  8001760:	4986      	ldr	r1, [pc, #536]	; (800197c <EC_out_of_range+0x290>)
@@ -2493,7 +2493,7 @@ void EC_out_of_range()
 		  //out of range
 		  //decrease sensitivity
 	  }
-	  if((final_average_cond>=3200)&& (SET100==1))
+	  if((final_average_cond>=3100)&& (SET100==1))
  80017c6:	4b6c      	ldr	r3, [pc, #432]	; (8001978 <EC_out_of_range+0x28c>)
  80017c8:	681b      	ldr	r3, [r3, #0]
  80017ca:	496c      	ldr	r1, [pc, #432]	; (800197c <EC_out_of_range+0x290>)
@@ -2738,7 +2738,7 @@ void EC_out_of_range()
  8001974:	46bd      	mov	sp, r7
  8001976:	bd80      	pop	{r7, pc}
  8001978:	200003c4 	.word	0x200003c4
- 800197c:	45480000 	.word	0x45480000
+ 800197c:	4541c000 	.word	0x4541c000
  8001980:	20000af4 	.word	0x20000af4
  8001984:	20000010 	.word	0x20000010
  8001988:	08008b9c 	.word	0x08008b9c
@@ -3993,7 +3993,7 @@ int main(void)
  8002284:	20000b08 	.word	0x20000b08
  8002288:	42480000 	.word	0x42480000
  800228c:	200003d0 	.word	0x200003d0
- 8002290:	44a78000 	.word	0x44a78000
+ 8002290:	44160000 	.word	0x44160000
  8002294:	45052000 	.word	0x45052000
  8002298:	40590000 	.word	0x40590000
  800229c:	200003d4 	.word	0x200003d4

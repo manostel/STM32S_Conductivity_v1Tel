@@ -101,7 +101,7 @@ uint16_t tempraw=0;
 uint16_t moistureraw=0;
 uint32_t value[3]; // adc valuyes
 float temp1;//
-const float MIN_VOLTAGE = 1340;
+const float MIN_VOLTAGE = 600;
 const float MAX_VOLTAGE = 2130;
 uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
@@ -410,7 +410,7 @@ void delay2(uint32_t delay_time) {
 
 void EC_out_of_range()
 {
-	  if((final_average_cond>=3200)&& (SET1==1))
+	  if((final_average_cond>=3100)&& (SET1==1))
 	  {
 		  for(int i=0;i<5;i++){
 		  ssd1306_Fill(0);
@@ -425,7 +425,7 @@ void EC_out_of_range()
 		  //out of range
 		  //decrease sensitivity
 	  }
-	  if((final_average_cond>=3200)&& (SET10==1))
+	  if((final_average_cond>=3100)&& (SET10==1))
 	  {
 		  for(int i=0;i<5;i++){
 		  ssd1306_Fill(0);
@@ -440,7 +440,7 @@ void EC_out_of_range()
 		  //out of range
 		  //decrease sensitivity
 	  }
-	  if((final_average_cond>=3200)&& (SET100==1))
+	  if((final_average_cond>=3100)&& (SET100==1))
 	  {
 		  for(int i=0;i<5;i++){
 		  ssd1306_Fill(0);
