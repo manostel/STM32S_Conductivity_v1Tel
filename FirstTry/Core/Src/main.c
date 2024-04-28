@@ -102,8 +102,8 @@ uint16_t tempraw=0;
 uint16_t moistureraw=0;
 uint32_t value[3]; // adc valuyes
 float temp1;//
-const float MIN_VOLTAGE = 600;
-const float MAX_VOLTAGE = 2130;
+float MIN_VOLTAGE = 600;
+float MAX_VOLTAGE = 2130;
 uint32_t adc_buffer[ADC_BUF_SIZE];
 float voltage_buffer[ADC_BUF_SIZE];
 uint8_t adc_ready=0;
@@ -549,7 +549,9 @@ void Set_SENSE(){
 		  SET10=0;
 		  SET100=0;
 		  SET1000=0;
-		  moist_offset=300;
+		  moist_offset=0;
+		  MIN_VOLTAGE = 750;
+		  MAX_VOLTAGE = 2467;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET1, "SENSE = x1     ");
 	      ssd1306_WriteString(bufferSET1, Font_6x8, 1);
@@ -562,6 +564,8 @@ void Set_SENSE(){
 		  SET100=0;
 		  SET1000=0;
 		  moist_offset=0;
+		  MIN_VOLTAGE = 830;
+		  MAX_VOLTAGE = 2467;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET10, "SENSE = x10     ");
 	      ssd1306_WriteString(bufferSET10, Font_6x8, 1);
@@ -574,6 +578,8 @@ void Set_SENSE(){
 		  SET100=1;
 		  SET1000=0;
 		  moist_offset=0;
+		  MIN_VOLTAGE = 950;
+		  MAX_VOLTAGE = 2467;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET100, "SENSE = x100     ");
 	      ssd1306_WriteString(bufferSET100, Font_6x8, 1);
@@ -586,6 +592,8 @@ void Set_SENSE(){
 		  SET100=0;
 		  SET1000=1;
 		  moist_offset=0;
+		  MIN_VOLTAGE = 1050;
+		  MAX_VOLTAGE = 2467;
 		  ssd1306_SetCursor(0, 41);
 	      sprintf(bufferSET1000, "SENSE = x1000     ");
 	      ssd1306_WriteString(bufferSET1000, Font_6x8, 1);
@@ -750,10 +758,13 @@ int main(void)
 		      HAL_Delay(100);
 
 
+//		      Set_Pin_InputPD(GPIOA,GPIO_PIN_1);
+
 
 		      // Add the average of this iteration to av_cond_sum
 		      av_cond_sum += av_cond;
 		  }
+
 
 		  // Calculate the final average
 		  final_average_cond = av_cond_sum / 15;
@@ -782,7 +793,7 @@ int main(void)
 		  ssd1306_SetCursor(0,30);
 		  ssd1306_WriteString("measurement...",Font_7x10,1);
 		  ssd1306_UpdateScreen();
-		  for(i=0;i<5;i++)
+		  for(i=0;i<15;i++)
 		  {
 			  PWM_MOIST();
 		  }
