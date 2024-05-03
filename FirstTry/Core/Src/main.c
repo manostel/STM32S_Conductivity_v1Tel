@@ -147,7 +147,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		{
 			counterflagPWM2=1;
 		}
-		if(counter2>10000)
+		if(counter2>20000)
 		{
 			timeout=1;
 		}
@@ -475,7 +475,7 @@ void EC_out_of_range()
 		//out of range
 		//decrease sensitivity
 	}
-	if((final_average_cond<=550) && (SET1000==1))
+	if((final_average_cond<=650) && (SET1000==1))
 	{
 		for(int i=0;i<5;i++){
 			ssd1306_Fill(0);
@@ -490,7 +490,7 @@ void EC_out_of_range()
 		//out of range
 		//increase sensitivity
 	}
-	if((final_average_cond<=550) && (SET100==1))
+	if((final_average_cond<=650) && (SET100==1))
 	{
 		for(int i=0;i<5;i++){
 			ssd1306_Fill(0);
@@ -505,7 +505,7 @@ void EC_out_of_range()
 		//out of range
 		//increase sensitivity
 	}
-	if((final_average_cond<=550) && (SET10==1))
+	if((final_average_cond<=650) && (SET10==1))
 	{
 		for(int i=0;i<5;i++){
 			ssd1306_Fill(0);
@@ -568,7 +568,7 @@ void Set_SENSE(){
 		SET100=0;
 		SET1000=0;
 		moist_offset=0;
-		MIN_VOLTAGE = 750;
+		MIN_VOLTAGE = 1200;
 		MAX_VOLTAGE = 2467;
 		ssd1306_SetCursor(0, 41);
 		sprintf(bufferSET1, "SENSE = x1     ");
@@ -673,9 +673,11 @@ void measureconduct(){
 			ssd1306_Fill(0);
 			ssd1306_UpdateScreen();
 			ssd1306_SetCursor(0, 0);
-			ssd1306_WriteString("Probe in Air",Font_7x10,1);
-			ssd1306_SetCursor(0, 10);
-			ssd1306_WriteString("Press Button",Font_7x10,1);
+			ssd1306_WriteString("1. Probe in Air",Font_7x10,1);
+			ssd1306_SetCursor(0, 15);
+			ssd1306_WriteString("2. Probe in Soil",Font_7x10,1);
+			ssd1306_SetCursor(0, 30);
+			ssd1306_WriteString("3. Press the Button",Font_7x10,1);
 			ssd1306_UpdateScreen();
 //				PWM_COND();
 //				PWM_COND();
@@ -948,6 +950,225 @@ void measuremoist(){
 	}
 }
 
+void moistconduct(){
+	if((HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)&((SET1||SET10)||SET100||SET1000))
+	{
+
+		counter2=0;
+		timeout=0;
+		while(timeout!=1)
+		{
+			ssd1306_Fill(0);
+			ssd1306_UpdateScreen();
+			ssd1306_SetCursor(0, 0);
+			ssd1306_WriteString("1.Probe in Air",Font_6x8,1);
+			ssd1306_SetCursor(0, 10);
+			ssd1306_WriteString("2.Add Distilled Water",Font_6x8,1);
+			ssd1306_SetCursor(0, 20);
+			ssd1306_WriteString("3.Mix Soil Sample",Font_6x8,1);
+			ssd1306_SetCursor(0, 30);
+			ssd1306_WriteString("4.Probe in Soil",Font_6x8,1);
+			ssd1306_SetCursor(0, 40);
+			ssd1306_WriteString("5.Press the Button",Font_6x8,1);
+			ssd1306_SetCursor(0, 50);
+			ssd1306_WriteString("5.Wait for the Results",Font_6x8,1);
+			ssd1306_UpdateScreen();
+			HAL_Delay(200);
+//				PWM_COND();
+//				PWM_COND();
+//				PWM_COND();
+//
+//				PWM_MOIST();
+//				PWM_MOIST();
+//				PWM_MOIST();
+
+
+			if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
+			{
+
+				av_cond=0;
+				av_moist=0;
+				final_average_cond=0;
+
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("Preparing ",Font_7x10,1);
+				ssd1306_SetCursor(0, 10);
+				ssd1306_WriteString("device for ",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("moisture ",Font_7x10,1);
+				ssd1306_SetCursor(0,30);
+				ssd1306_WriteString("measurement...",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				for(i=0;i<15;i++)
+				{
+					PWM_MOIST();
+				}
+
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("Measuring",Font_7x10,1);
+				ssd1306_SetCursor(0, 10);
+				ssd1306_WriteString("Moisture...",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				ssd1306_Fill(0);
+
+				ADC_CH2();
+
+				// Inside your loop
+				percentage_moist2 = 0; // Initialize averaged percentage variable
+
+				av_moist_sum=0;
+
+				for (j = 0; j < 4; j++) {
+					percentage_moist=0;
+					av_moist = 0; // Reset av_moist for each iteration
+					PWM_MOIST();
+					HAL_ADC_Start(&hadc2);
+					for (i = 0; i < 5; i++) {
+						HAL_ADC_PollForConversion(&hadc2, 1);
+						adc_buffer[1] = HAL_ADC_GetValue(&hadc2);
+						voltage_buffer[1] = adc_value_to_voltage(adc_buffer[1]);
+						av_moist += voltage_buffer[1] / 5;
+						percentage_moist = 100.0-(((((av_moist+moist_offset) - MIN_VOLTAGE)) / (MAX_VOLTAGE - MIN_VOLTAGE)) * 100.0);
+					}
+					HAL_ADC_Stop(&hadc2);
+
+					// Calculate percentage_moist for this iteration
+					av_moist_sum+=(av_moist+moist_offset);
+
+					// Accumulate the calculated percentage
+					percentage_moist2 += percentage_moist;
+
+				}
+
+				// Calculate the average of percentage_moist over 15 measurements
+				av_moist_sum/=4;
+				percentage_moist2 /= 4;
+				// Manipulate the last value of percentage_moist2
+				if (percentage_moist2 > 100) {
+					percentage_moist2 = 100;
+				} else if (percentage_moist2 < 0) {
+					percentage_moist2 = 0;
+				}
+				if(percentage_moist2>=80)
+				{
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("MOISTURE OK",Font_7x10,1);
+					ssd1306_SetCursor(0, 15);
+					ssd1306_WriteString("OVER 80%",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					ssd1306_Fill(0);
+					HAL_Delay(3000);
+				}
+				else if(percentage_moist2<80)
+				{
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("MOISTURE LOW",Font_7x10,1);
+					ssd1306_SetCursor(0, 15);
+					ssd1306_WriteString("UNDER 80%",Font_7x10,1);
+					ssd1306_SetCursor(0, 30);
+					ssd1306_WriteString("ADD DISTILLED",Font_7x10,1);
+					ssd1306_SetCursor(0, 45);
+					ssd1306_WriteString("WATER",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					ssd1306_Fill(0);
+					HAL_Delay(3000);
+					timeout=0;
+					break;
+				}
+
+
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("Measuring",Font_7x10,1);
+				ssd1306_SetCursor(0, 10);
+				ssd1306_WriteString("Conductivity...",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				ssd1306_Fill(0);
+
+
+				ADC_CH1();
+				for(int i=0;i<50;i++)
+				{
+					PWM_COND();
+				}
+
+
+
+				float av_cond_sum = 0;
+
+				for(int j = 0; j < 15; j++) {
+
+					HAL_ADC_Start(&hadc2);
+					PWM_COND();
+					float av_cond = 0; // Initialize av_cond for each iteration
+
+					for(int i = 0; i < 30; i++) {
+
+						PWM_COND();
+						HAL_ADC_PollForConversion(&hadc2, 1);
+						adc_buffer[0] = HAL_ADC_GetValue(&hadc2);
+						voltage_buffer[0] = adc_value_to_voltage(adc_buffer[0]);
+						av_cond += voltage_buffer[0] / 30; // Accumulate the value
+
+					}
+
+					HAL_ADC_Stop(&hadc2);
+					HAL_Delay(100);
+
+//						Set_Conductivity_outputs_PD();
+					//
+
+
+					// Add the average of this iteration to av_cond_sum
+					av_cond_sum += av_cond;
+				}
+
+
+				// Calculate the final average
+				final_average_cond = av_cond_sum / 15;
+
+				EC_out_of_range();
+
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("Conductivity ",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("measurement",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("finished",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(4000);
+				timeout=0;
+				break;
+
+			}
+		}
+		if(timeout==1)
+		{
+			ssd1306_Fill(0);
+			ssd1306_UpdateScreen();
+			ssd1306_SetCursor(0, 0);
+			ssd1306_WriteString("Timeout",Font_7x10,1);
+			ssd1306_SetCursor(0, 10);
+			ssd1306_WriteString("Triggered",Font_7x10,1);
+			ssd1306_UpdateScreen();
+			HAL_Delay(1000);
+			timeout=0;
+		}
+	}
+
+}
+
 
 /* USER CODE END PFP */
 
@@ -1020,9 +1241,9 @@ int main(void)
 
 		Set_counterFREQ();
 		//MEASURE SEQUENTIAL
-		measureconduct();
+//		measureconduct();
 //		measuremoist();
-
+		moistconduct();
 
 		//DS18B20
 		Temp=DS18B20_GetTemp();
