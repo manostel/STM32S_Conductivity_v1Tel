@@ -663,7 +663,7 @@ void Set_counterFREQ_ssd1306(){
 }
 
 void measureconduct(){
-	if((HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)&((SET1||SET10)||SET100))
+	if((HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)&((SET1||SET10)||SET100||SET1000))
 	{
 
 		counter2=0;
@@ -1021,7 +1021,7 @@ int main(void)
 		Set_counterFREQ();
 		//MEASURE SEQUENTIAL
 		measureconduct();
-		measuremoist();
+//		measuremoist();
 
 
 		//DS18B20
