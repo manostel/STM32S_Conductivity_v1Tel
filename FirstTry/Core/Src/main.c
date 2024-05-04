@@ -24,6 +24,7 @@
 #include "ssd1306_fonts.h"
 #include "ssd1306_tests.h"
 #include "stdio.h"
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,12 +41,9 @@
 #define DELAY_COND 6
 #define DELAY_MOIST 1
 
-#define SLOPE_1 -0.02667
-#define INTERCEPT_1 15.333
-#define SLOPE_2 -0.0015
-#define INTERCEPT_2 2.75
-#define SLOPE_3 -0.00027444
-#define INTERCEPT_3 0.911
+
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -146,17 +144,55 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 
-float calculateEC(float voltage) {
-    if (voltage >= 200 && voltage < 500) {
-        return SLOPE_1 * voltage + INTERCEPT_1;
-    } else if (voltage >= 500 && voltage < 1500) {
-        return SLOPE_2 * voltage + INTERCEPT_2;
-    } else if (voltage >= 1500 && voltage <= 3300) {
-        return SLOPE_3 * voltage + INTERCEPT_3;
-    } else {
-        return 0; // Voltage out of range
-    }
+float calculateECSET1(float voltage) {
+	const float voltagePerOhm = 250;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+	}
+
+	return conductivity;
+
 }
+float calculateECSET10(float voltage) {
+	const float voltagePerOhm = 1.69;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+	}
+
+	return conductivity;
+
+}
+float calculateECSET100(float voltage) {
+	const float voltagePerOhm = 0.172;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10000;  // uS/cm
+	}
+
+	return conductivity;
+
+}
+float calculateECSET1000(float voltage) {
+	const float voltagePerOhm = 0.0172;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10000;  // uS/cm
+	}
+
+	return conductivity;
+
+}
+
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM3) {
@@ -183,6 +219,127 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	}
 }
 
+void salinity_fertilizer() {
+	if((SET1==1)||(SET10==1))
+	{
+		if(conductivity==0){
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("NO CONDUCTIVITY ",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("MEASUREMENT",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("CAN'T ESTIMATE",Font_7x10,1);
+				ssd1306_SetCursor(0,30);
+				ssd1306_WriteString("SALINITY",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
+			}
+		}
+		if((conductivity<=2)&&(conductivity!=0))
+		{
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("SALINITY",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("LOW",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("GOOD FOR",Font_7x10,1);
+				ssd1306_SetCursor(0,30);
+				ssd1306_WriteString("CROPS",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
+			}
+		}
+		if((conductivity>=2)&&(conductivity<=4))
+		{
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("SALINITY",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("MODERATE",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("MAY HARM",Font_7x10,1);
+				ssd1306_SetCursor(0,30);
+				ssd1306_WriteString("CROPS",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
+			}
+		}
+		if((conductivity>=4)&&(conductivity!=0))
+		{
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("SALINITY",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("HIGH",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("BAD FOR",Font_7x10,1);
+				ssd1306_SetCursor(0,30);
+				ssd1306_WriteString("CROPS",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
+			}
+		}
+	}
+	if((SET100==1)||(SET1000==1))
+	{
+		if(conductivity==0){
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("NO CONDUCTIVITY ",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("MEASUREMENT",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("CAN'T ESTIMATE",Font_7x10,1);
+				ssd1306_SetCursor(0,30);
+				ssd1306_WriteString("SALINITY",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
+			}
+		}
+		if((conductivity<=5.55)&&(conductivity>=1.55))
+		{
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("SOIL",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("LACKS OF",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("NUTRITIENTS",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
+			}
+			if((conductivity<=2.55)&&(conductivity>=0))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("SOIL",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("NEEDS",Font_7x10,1);
+					ssd1306_SetCursor(0,20);
+					ssd1306_WriteString("FERTILIZERS",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					HAL_Delay(1000);
+				}
+			}
+		}
+	}
+}
 
 void PWM_COND() {
 
@@ -225,21 +382,6 @@ void PWM_MOIST(){
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 0);
 
-}
-
-float voltage_to_conductivity(float voltage) { //it needs fix
-	// Define the calibration points
-	float voltage_low = 3.3; // Lowest voltage
-	float conductivity_low = 0.0; // Corresponding conductivity
-
-	float voltage_high = 0.6; // Highest voltage
-	float conductivity_high = 100.0; // Corresponding conductivity
-
-	// Calculate the slope (m)
-	float slope = (conductivity_high - conductivity_low) / (voltage_high - voltage_low);
-
-	// Linear interpolation formula
-	return slope * (voltage - voltage_low) + conductivity_low;
 }
 
 
@@ -468,6 +610,7 @@ void EC_out_of_range()
 			ssd1306_SetCursor(0,10);
 			ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
 			ssd1306_UpdateScreen();
+			conductivity=0;
 			HAL_Delay(1000);
 		}
 		//out of range
@@ -483,6 +626,7 @@ void EC_out_of_range()
 			ssd1306_SetCursor(0,10);
 			ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
 			ssd1306_UpdateScreen();
+			conductivity=0;
 			HAL_Delay(1000);
 		}
 		//out of range
@@ -498,6 +642,7 @@ void EC_out_of_range()
 			ssd1306_SetCursor(0,10);
 			ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
 			ssd1306_UpdateScreen();
+			conductivity=0;
 			HAL_Delay(1000);
 		}
 		//out of range
@@ -513,6 +658,7 @@ void EC_out_of_range()
 			ssd1306_SetCursor(0,10);
 			ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
 			ssd1306_UpdateScreen();
+			conductivity=0;
 			HAL_Delay(1000);
 		}
 		//out of range
@@ -528,6 +674,7 @@ void EC_out_of_range()
 			ssd1306_SetCursor(0,10);
 			ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
 			ssd1306_UpdateScreen();
+			conductivity=0;
 			HAL_Delay(1000);
 		}
 		//out of range
@@ -543,6 +690,7 @@ void EC_out_of_range()
 			ssd1306_SetCursor(0,10);
 			ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
 			ssd1306_UpdateScreen();
+			conductivity=0;
 			HAL_Delay(1000);
 		}
 		//out of range
@@ -595,7 +743,6 @@ void Set_SENSE(){
 		SET10=0;
 		SET100=0;
 		SET1000=0;
-		EC_FACTOR=
 		moist_offset=0;
 		MIN_VOLTAGE = 1630;
 		MAX_VOLTAGE = 2467;
@@ -860,7 +1007,7 @@ void moistconduct(){
 					HAL_ADC_Stop(&hadc2);
 					HAL_Delay(100);
 
-//						Set_Conductivity_outputs_PD();
+					//						Set_Conductivity_outputs_PD();
 					//
 
 
@@ -872,7 +1019,7 @@ void moistconduct(){
 				// Calculate the final average
 				final_average_cond = av_cond_sum / 15;
 
-				EC_out_of_range();
+
 
 				ssd1306_Fill(0);
 				ssd1306_UpdateScreen();
@@ -884,9 +1031,25 @@ void moistconduct(){
 				ssd1306_WriteString("finished",Font_7x10,1);
 				ssd1306_UpdateScreen();
 				HAL_Delay(4000);
-
-				conductivity=calculateEC(final_average_cond);
-
+				if(SET1==1)
+				{
+					conductivity=calculateECSET1(final_average_cond);
+				}
+				if(SET10==1)
+				{
+					conductivity=calculateECSET10(final_average_cond);
+				}
+				if(SET100==1)
+				{
+					conductivity=calculateECSET100(final_average_cond);
+				}
+				if(SET1000==1)
+				{
+					conductivity=calculateECSET1000(final_average_cond);
+				}
+				HAL_Delay(4000);
+				EC_out_of_range();
+				salinity_fertilizer();
 
 				timeout=0;
 				break;
@@ -981,8 +1144,7 @@ int main(void)
 
 		Set_counterFREQ();
 		//MEASURE SEQUENTIAL
-//		measureconduct();
-//		measuremoist();
+
 		moistconduct();
 
 		//DS18B20
@@ -1002,10 +1164,16 @@ int main(void)
 
 
 
-
-		ssd1306_SetCursor(0, 0);
-		sprintf(bufferConduct,"EC %.fmV %.2f mS/cm",final_average_cond,conductivity);
-		ssd1306_WriteString(bufferConduct,Font_6x8,1);
+		if((SET1==1)||SET10==1){
+			ssd1306_SetCursor(0, 0);
+			sprintf(bufferConduct,"EC %.fmV %.2f mS/cm",final_average_cond,conductivity);
+			ssd1306_WriteString(bufferConduct,Font_6x8,1);
+		}
+		if((SET100==1)||SET1000==1){
+			ssd1306_SetCursor(0, 0);
+			sprintf(bufferConduct,"EC %.fmV %.2f uS/cm",final_average_cond,conductivity);
+			ssd1306_WriteString(bufferConduct,Font_6x8,1);
+		}
 		ssd1306_SetCursor(0, 11);
 		sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist_sum,percentage_moist2);
 		ssd1306_WriteString(bufferMoist,Font_6x8,1);
