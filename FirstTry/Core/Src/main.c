@@ -400,6 +400,8 @@ void salinity_fertilizer() {
 			}
 		}
 	}
+	ssd1306_Fill(0);
+	ssd1306_UpdateScreen();
 }
 
 void PWM_COND() {
