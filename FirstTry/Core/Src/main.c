@@ -145,15 +145,53 @@ static void MX_TIM2_Init(void);
 
 
 float calculateECSET1(float voltage) {
-	const float voltagePerOhm = 250;  // Voltage increase per ohm
+	if((voltage>1500)&&(voltage<=3300))
+	{
+	const float voltagePerOhm = 200;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
 	float conductivity = 0;
-
 	if (resistance != 0) {
 		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
 	}
 
 	return conductivity;
+	}
+	if((voltage>1000)&&(voltage<=1500))
+	{
+	const float voltagePerOhm = 300;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+	}
+
+	return conductivity;
+	}
+	if((voltage>700)&&(voltage<=1000))
+	{
+	const float voltagePerOhm = 450;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+	}
+
+	return conductivity;
+	}
+	if((voltage>0)&&(voltage<=700))
+	{
+	const float voltagePerOhm = 600;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float conductivity = 0;
+	if (resistance != 0) {
+		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+	}
+
+	return conductivity;
+	}
+
+
+
 
 }
 float calculateECSET10(float voltage) {
@@ -322,20 +360,21 @@ void salinity_fertilizer() {
 				ssd1306_UpdateScreen();
 				HAL_Delay(1000);
 			}
-			if((conductivity<=2.55)&&(conductivity>=0))
-			{
-				for(int i=0;i<5;i++){
-					ssd1306_Fill(0);
-					ssd1306_UpdateScreen();
-					ssd1306_SetCursor(0, 0);
-					ssd1306_WriteString("SOIL",Font_7x10,1);
-					ssd1306_SetCursor(0,10);
-					ssd1306_WriteString("NEEDS",Font_7x10,1);
-					ssd1306_SetCursor(0,20);
-					ssd1306_WriteString("FERTILIZERS",Font_7x10,1);
-					ssd1306_UpdateScreen();
-					HAL_Delay(1000);
-				}
+
+		}
+		if((conductivity<=2.55)&&(conductivity>=0))
+		{
+			for(int i=0;i<5;i++){
+				ssd1306_Fill(0);
+				ssd1306_UpdateScreen();
+				ssd1306_SetCursor(0, 0);
+				ssd1306_WriteString("SOIL",Font_7x10,1);
+				ssd1306_SetCursor(0,10);
+				ssd1306_WriteString("NEEDS",Font_7x10,1);
+				ssd1306_SetCursor(0,20);
+				ssd1306_WriteString("FERTILIZERS",Font_7x10,1);
+				ssd1306_UpdateScreen();
+				HAL_Delay(1000);
 			}
 		}
 	}
@@ -600,7 +639,7 @@ void delay2(uint32_t delay_time) {
 
 void EC_out_of_range()
 {
-	if((final_average_cond>=3100)&& (SET1==1))
+	if((final_average_cond>=3000)&& (SET1==1))
 	{
 		for(int i=0;i<5;i++){
 			ssd1306_Fill(0);
@@ -616,7 +655,7 @@ void EC_out_of_range()
 		//out of range
 		//decrease sensitivity
 	}
-	if((final_average_cond>=3100)&& (SET10==1))
+	if((final_average_cond>=3000)&& (SET10==1))
 	{
 		for(int i=0;i<5;i++){
 			ssd1306_Fill(0);
@@ -632,7 +671,7 @@ void EC_out_of_range()
 		//out of range
 		//decrease sensitivity
 	}
-	if((final_average_cond>=3100)&& (SET100==1))
+	if((final_average_cond>=3000)&& (SET100==1))
 	{
 		for(int i=0;i<5;i++){
 			ssd1306_Fill(0);
