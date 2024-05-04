@@ -40,6 +40,8 @@
 #define VREF 3310
 #define DELAY_COND 6
 #define DELAY_MOIST 1
+#define BASELINE_TEMP 25.0
+#define TEMP_COMP_COEFF 0.02  // 2% per degree Celsius
 
 
 
@@ -81,6 +83,7 @@ float av_moist=0;
 float percentage_moist=0;
 float percentage_moist2=0;
 float Temp=0;
+float Temp2=0;
 float Temperature=0;
 uint8_t Presence=0;
 uint8_t Temp_byte1,Temp_byte2;
@@ -144,90 +147,109 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 
-float calculateECSET1(float voltage) {
+float calculateECSET1(float voltage,float Temp) {
 	if((voltage>1500)&&(voltage<=3300))
 	{
 	const float voltagePerOhm = 200;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10;  // Convert S/m to mS/cm
 	}
-
-	return conductivity;
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 	}
 	if((voltage>1000)&&(voltage<=1500))
 	{
 	const float voltagePerOhm = 300;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10;  // Convert S/m to mS/cm
 	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 
-	return conductivity;
+
 	}
 	if((voltage>700)&&(voltage<=1000))
 	{
 	const float voltagePerOhm = 450;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10;  // Convert S/m to mS/cm
 	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 
-	return conductivity;
+
 	}
 	if((voltage>0)&&(voltage<=700))
 	{
 	const float voltagePerOhm = 600;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10;  // Convert S/m to mS/cm
 	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 
-	return conductivity;
+
 	}
 
 
 
 
 }
-float calculateECSET10(float voltage) {
+float calculateECSET10(float voltage,float Temp) {
 	const float voltagePerOhm = 1.69;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10;  // Convert S/m to mS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10;  // Convert S/m to mS/cm
 	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 
-	return conductivity;
+
 
 }
-float calculateECSET100(float voltage) {
+float calculateECSET100(float voltage,float Temp) {
 	const float voltagePerOhm = 0.172;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10000;  // uS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10000;  // uS/cm
 	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 
-	return conductivity;
+
 
 }
-float calculateECSET1000(float voltage) {
+float calculateECSET1000(float voltage,float Temp) {
 	const float voltagePerOhm = 0.0172;  // Voltage increase per ohm
 	float resistance = voltage / voltagePerOhm;
-	float conductivity = 0;
+	float uncompensatedConductivity  = 0;
 
 	if (resistance != 0) {
-		conductivity = (1 / resistance) * 10000;  // uS/cm
+		uncompensatedConductivity  = (1 / resistance) * 10000;  // uS/cm
 	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
 
-	return conductivity;
+
 
 }
 
@@ -1058,12 +1080,18 @@ void moistconduct(){
 				// Calculate the final average
 				final_average_cond = av_cond_sum / 15;
 
-
+				for(i=0;i<10;i++)
+				{
+				Temp=DS18B20_GetTemp();
+				Temp2+=Temp;
+				HAL_Delay(100);
+				}
+				Temp=Temp2/10;
 
 				ssd1306_Fill(0);
 				ssd1306_UpdateScreen();
 				ssd1306_SetCursor(0, 0);
-				ssd1306_WriteString("Conductivity ",Font_7x10,1);
+				ssd1306_WriteString("Conductivity+Temp ",Font_7x10,1);
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("measurement",Font_7x10,1);
 				ssd1306_SetCursor(0,20);
@@ -1072,19 +1100,19 @@ void moistconduct(){
 				HAL_Delay(4000);
 				if(SET1==1)
 				{
-					conductivity=calculateECSET1(final_average_cond);
+					conductivity=calculateECSET1(final_average_cond,Temp);
 				}
 				if(SET10==1)
 				{
-					conductivity=calculateECSET10(final_average_cond);
+					conductivity=calculateECSET10(final_average_cond,Temp);
 				}
 				if(SET100==1)
 				{
-					conductivity=calculateECSET100(final_average_cond);
+					conductivity=calculateECSET100(final_average_cond,Temp);
 				}
 				if(SET1000==1)
 				{
-					conductivity=calculateECSET1000(final_average_cond);
+					conductivity=calculateECSET1000(final_average_cond,Temp);
 				}
 				HAL_Delay(4000);
 				EC_out_of_range();
