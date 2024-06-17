@@ -42,6 +42,8 @@
 #define DELAY_MOIST 1
 #define BASELINE_TEMP 25.0
 #define TEMP_COMP_COEFF 0.02  // 2% per degree Celsius
+#define PI 3.14
+
 
 
 
@@ -58,6 +60,8 @@ ADC_HandleTypeDef hadc2;
 
 I2C_HandleTypeDef hi2c1;
 
+SPI_HandleTypeDef hspi1;
+
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -69,9 +73,10 @@ uint32_t delay_time = 20000; // Initial delay time in microseconds
 uint32_t delay_band = 1000; // Initial delay band in microseconds
 uint8_t i=0;
 uint8_t j=0;
+uint8_t data_rdy=0;
 uint32_t counter=0;
 uint32_t counter2=0;
-uint16_t counterFREQ=6;
+uint16_t counterFREQ=0;
 int32_t PWM_loop=0;
 uint16_t timeout=0;
 float moist_offset=0;
@@ -79,6 +84,7 @@ float av_moist_sum=0;
 float final_average_cond=0;
 float av_cond=0;
 float conductivity=0;
+float resistance=0;
 float av_moist=0;
 float percentage_moist=0;
 float percentage_moist2=0;
@@ -96,8 +102,9 @@ const float CALIBRATION_FACTORX100=0.09;
 const float CALIBRATION_FACTORX1000=0.01;
 
 
-
+char bufferResistance[200];
 char bufferConduct[200];
+char bufferConduct2[200];
 char bufferMoist[200];
 char bufferTemp[200];
 char bufferDs18b20[200];
@@ -144,7 +151,76 @@ static void MX_TIM1_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
+float new_calculateECSET1(float voltage,float Temp){
+	const float voltagePerOhm = 20;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float resistivity = resistance * (6.0*3.14);
+	float uncompensatedConductivity  = 0;
+	if (resistivity != 0) {
+		uncompensatedConductivity  = (1 / resistivity) * 1000;  // Convert S/m to mS/cm
+	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
+}
+float new_calculateRSET1(float voltage){
+	const float voltagePerOhm = 20;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	return resistance;
+}
+float new_calculateECSET10(float voltage,float Temp){
+	const float voltagePerOhm = 3.1;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float resistivity = resistance * (6.0*3.14);
+	float uncompensatedConductivity  = 0;
+	if (resistivity != 0) {
+		uncompensatedConductivity  = (1 / resistivity) * 1000;  // Convert S/m to mS/cm
+	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
+}
+float new_calculateRSET10(float voltage){
+	const float voltagePerOhm = 3.1;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	return resistance;
+}
+float new_calculateECSET100(float voltage,float Temp){
+	const float voltagePerOhm = 0.31;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float resistivity = resistance * (6.0*3.14);
+	float uncompensatedConductivity  = 0;
+	if (resistivity != 0) {
+		uncompensatedConductivity  = (1 / resistivity) * 1000000;  // Convert S/m to uS/cm
+	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
+}
+float new_calculateRSET100(float voltage){
+	const float voltagePerOhm = 0.31;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	return resistance;
+}
+float new_calculateECSET1000(float voltage,float Temp){
+	const float voltagePerOhm = 0.031;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	float resistivity = resistance * (6.0*3.14);
+	float uncompensatedConductivity  = 0;
+	if (resistivity != 0) {
+		uncompensatedConductivity  = (1 / resistivity) * 1000000;  // Convert S/m to uS/cm
+	}
+	float tempCompensationFactor = 1 + (TEMP_COMP_COEFF * (Temp - BASELINE_TEMP));
+	float compensatedConductivity = uncompensatedConductivity * tempCompensationFactor;
+	return compensatedConductivity;
+}
+float new_calculateRSET1000(float voltage){
+	const float voltagePerOhm = 0.031;  // Voltage increase per ohm
+	float resistance = voltage / voltagePerOhm;
+	return resistance;
+}
 
 
 float calculateECSET1(float voltage,float Temp) {
@@ -859,6 +935,17 @@ float calculateECSET10(float voltage,float Temp) {
 		return Temperature;
 	}
 
+	void ADC_CH0(void)
+	{
+		ADC_ChannelConfTypeDef sConfig = {0};
+		sConfig.Channel = ADC_CHANNEL_0;
+		sConfig.Rank = ADC_REGULAR_RANK_1;
+		sConfig.SamplingTime = ADC_SAMPLETIME_41CYCLES_5;
+		if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+		{
+			Error_Handler();
+		}
+	}
 	void ADC_CH1(void)
 	{
 		ADC_ChannelConfTypeDef sConfig = {0};
@@ -902,9 +989,108 @@ float calculateECSET10(float voltage,float Temp) {
 		}
 	}
 
+	void EC_out_of_range_fast()
+		{
+			if((final_average_cond>=3080)&& (SET1==1))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
+					ssd1306_UpdateScreen();
+//					conductivity=0;
+					HAL_Delay(100);
+				}
+				//out of range
+				//decrease sensitivity
+			}
+			if((final_average_cond>=3080)&& (SET10==1))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					//					conductivity=0;
+					HAL_Delay(100);
+				}
+				//out of range
+				//decrease sensitivity
+			}
+			if((final_average_cond>=3080)&& (SET100==1))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					//					conductivity=0;
+					HAL_Delay(100);
+				}
+				//out of range
+				//decrease sensitivity
+			}
+			if((final_average_cond<=650) && (SET1000==1))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					//					conductivity=0;
+					HAL_Delay(100);
+				}
+				//out of range
+				//increase sensitivity
+			}
+			if((final_average_cond<=650) && (SET100==1))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
+					ssd1306_UpdateScreen();
+//					conductivity=0;
+					HAL_Delay(100);
+				}
+				//out of range
+				//increase sensitivity
+			}
+			if((final_average_cond<=650) && (SET10==1))
+			{
+				for(int i=0;i<5;i++){
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("EC OUT OF RANGE ",Font_7x10,1);
+					ssd1306_SetCursor(0,10);
+					ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					//					conductivity=0;
+					HAL_Delay(100);
+				}
+				//out of range
+				//increase sensitivity
+			}
+		}
 	void EC_out_of_range()
 	{
-		if((final_average_cond>=3000)&& (SET1==1))
+		if((final_average_cond>=3080)&& (SET1==1))
 		{
 			for(int i=0;i<5;i++){
 				ssd1306_Fill(0);
@@ -914,13 +1100,13 @@ float calculateECSET10(float voltage,float Temp) {
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
 				ssd1306_UpdateScreen();
-				conductivity=0;
+				//					conductivity=0;
 				HAL_Delay(1000);
 			}
 			//out of range
 			//decrease sensitivity
 		}
-		if((final_average_cond>=3000)&& (SET10==1))
+		if((final_average_cond>=3080)&& (SET10==1))
 		{
 			for(int i=0;i<5;i++){
 				ssd1306_Fill(0);
@@ -930,13 +1116,13 @@ float calculateECSET10(float voltage,float Temp) {
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
 				ssd1306_UpdateScreen();
-				conductivity=0;
+				//					conductivity=0;
 				HAL_Delay(1000);
 			}
 			//out of range
 			//decrease sensitivity
 		}
-		if((final_average_cond>=3000)&& (SET100==1))
+		if((final_average_cond>=3080)&& (SET100==1))
 		{
 			for(int i=0;i<5;i++){
 				ssd1306_Fill(0);
@@ -946,7 +1132,7 @@ float calculateECSET10(float voltage,float Temp) {
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("DECREASE SENSE",Font_7x10,1);
 				ssd1306_UpdateScreen();
-				conductivity=0;
+				//					conductivity=0;
 				HAL_Delay(1000);
 			}
 			//out of range
@@ -962,7 +1148,7 @@ float calculateECSET10(float voltage,float Temp) {
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
 				ssd1306_UpdateScreen();
-				conductivity=0;
+				//					conductivity=0;
 				HAL_Delay(1000);
 			}
 			//out of range
@@ -978,7 +1164,7 @@ float calculateECSET10(float voltage,float Temp) {
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
 				ssd1306_UpdateScreen();
-				conductivity=0;
+				//					conductivity=0;
 				HAL_Delay(1000);
 			}
 			//out of range
@@ -994,7 +1180,7 @@ float calculateECSET10(float voltage,float Temp) {
 				ssd1306_SetCursor(0,10);
 				ssd1306_WriteString("INCREASE SENSE",Font_7x10,1);
 				ssd1306_UpdateScreen();
-				conductivity=0;
+				//					conductivity=0;
 				HAL_Delay(1000);
 			}
 			//out of range
@@ -1008,35 +1194,43 @@ float calculateECSET10(float voltage,float Temp) {
 			HAL_Delay(100);
 			counterFREQ++;
 		}
+		if(counterFREQ==0){
+			delay_time = 10000; // 100HZ
+			delay_band = 5000; // Initial delay band in microseconds
+		}
 		if(counterFREQ==1){
-			delay_time = 2000; // Initial delay time in microseconds
-			delay_band = 100; // Initial delay band in microseconds
+			delay_time = 1000; // 1KHZ
+			delay_band = 500; // Initial delay band in microseconds
 		}
 		if(counterFREQ==2){
-			delay_time = 200; // Initial delay time in microseconds
-			delay_band = 10; // Initial delay band in microseconds
-		}
-		if(counterFREQ==3){
-			delay_time = 100; // Initial delay time in microseconds
+			delay_time = 100; // 10KHZ delay time in microseconds
 			delay_band = 5; // Initial delay band in microseconds
 		}
+		if(counterFREQ==3){
+			delay_time = 20; // 100KHZ Initial delay time in microseconds
+			delay_band = 1; // Initial delay band in microseconds
+		}
 		if(counterFREQ==4){
-			delay_time = 50; // Initial delay time in microseconds
-			delay_band = 2; // Initial delay band in microseconds
-		}
-		if(counterFREQ==5){
-			delay_time = 25; // Initial delay time in microseconds
+			delay_time = 7; // 100KHZ Initial delay time in microseconds
 			delay_band = 1; // Initial delay band in microseconds
 		}
-		if(counterFREQ==6){
-			delay_time = 12; // Initial delay time in microseconds
-			delay_band = 1; // Initial delay band in microseconds
-		}
-		if(counterFREQ==7){
-			delay_time = 6; // Initial delay time in microseconds
-			delay_band = 1; // Initial delay band in microseconds
-		}
-		if(counterFREQ>7){
+//		if(counterFREQ==4){
+//			delay_time = 50; // Initial delay time in microseconds
+//			delay_band = 2; // Initial delay band in microseconds
+//		}
+//		if(counterFREQ==5){
+//			delay_time = 25; // Initial delay time in microseconds
+//			delay_band = 1; // Initial delay band in microseconds
+//		}
+//		if(counterFREQ==6){
+//			delay_time = 10; // Initial delay time in microseconds
+//			delay_band = 1; // Initial delay band in microseconds
+//		}
+//		if(counterFREQ==7){
+//			delay_time = 6; // Initial delay time in microseconds
+//			delay_band = 1; // Initial delay band in microseconds
+//		}
+		if(counterFREQ>4){
 			counterFREQ=0;
 		}
 	}
@@ -1112,70 +1306,228 @@ float calculateECSET10(float voltage,float Temp) {
 		}
 		if (counterFREQ==2){
 			ssd1306_SetCursor(0,51);
-			sprintf(bufferFREQ,"Frequency:2 6KHz  ");
+			sprintf(bufferFREQ,"Frequency:2 10KHz  ");
 			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 		}
 		if (counterFREQ==3){
 			ssd1306_SetCursor(0,51);
-			sprintf(bufferFREQ,"Frequency:3 20KHz  ");
+			sprintf(bufferFREQ,"Frequency:3 50KHz  ");
 			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 		}
 		if (counterFREQ==4){
 			ssd1306_SetCursor(0,51);
-			sprintf(bufferFREQ,"Frequency:4 40KHz  ");
+			sprintf(bufferFREQ,"Frequency:4 100KHz  ");
 			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
 		}
-		if (counterFREQ==5){
-			ssd1306_SetCursor(0,51);
-			sprintf(bufferFREQ,"Frequency:5 75KHz  ");
-			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
-		}
-		if (counterFREQ==6){
-			ssd1306_SetCursor(0,51);
-			sprintf(bufferFREQ,"Frequency:6 133KHz  ");
-			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
-		}
-		if (counterFREQ==7){
-			ssd1306_SetCursor(0,51);
-			sprintf(bufferFREQ,"Frequency:7 200KHz  ");
-			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
-		}
+//		if (counterFREQ==5){
+//			ssd1306_SetCursor(0,51);
+//			sprintf(bufferFREQ,"Frequency:5 75KHz  ");
+//			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+//		}
+//		if (counterFREQ==6){
+//			ssd1306_SetCursor(0,51);
+//			sprintf(bufferFREQ,"Frequency:6 133KHz  ");
+//			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+//		}
+//		if (counterFREQ==7){
+//			ssd1306_SetCursor(0,51);
+//			sprintf(bufferFREQ,"Frequency:7 200KHz  ");
+//			ssd1306_WriteString(bufferFREQ, Font_6x8, 1);
+//		}
 	}
 
+	void send_data() {
+	    // Format the data
+	    sprintf(bufferConduct, "R %.fmV %.f Ohm", final_average_cond, resistance);
+	    sprintf(bufferMoist, "Moist %.1fV %.1f%%", av_moist_sum, percentage_moist2);
+	    sprintf(bufferDs18b20, "ds18b20 %.2fC", Temp);
 
+	    // Choose the correct buffer for conductivity based on settings
+	    if (SET1 == 1 || SET10 == 1) {
+	        sprintf(bufferConduct2, "EC %.3f mS/cm", conductivity);
+	    } else if (SET100 == 1 || SET1000 == 1) {
+	        sprintf(bufferConduct2, "EC %.3f uS/cm", conductivity);
+	    }
+
+	    // Format the SENSE settings
+	    if (HAL_GPIO_ReadPin(SET_1_GPIO_Port, SET_1_Pin) == 1) {
+	        sprintf(bufferSET1, "SENSE = x1");
+	    } else if (HAL_GPIO_ReadPin(SET_10_GPIO_Port, SET_10_Pin) == 1) {
+	        sprintf(bufferSET10, "SENSE = x10");
+	    } else if (HAL_GPIO_ReadPin(SET_100_GPIO_Port, SET_100_Pin) == 1) {
+	        sprintf(bufferSET100, "SENSE = x100");
+	    } else if (HAL_GPIO_ReadPin(SET_1000_GPIO_Port, SET_1000_Pin) == 1) {
+	        sprintf(bufferSET1000, "SENSE = x1000");
+	    }
+
+	    // Format the frequency setting
+	    if (counterFREQ == 0) {
+	        sprintf(bufferFREQ, "Frequency: 0 100Hz");
+	    } else if (counterFREQ == 1) {
+	        sprintf(bufferFREQ, "Frequency: 1 1KHz");
+	    } else if (counterFREQ == 2) {
+	        sprintf(bufferFREQ, "Frequency: 2 10KHz");
+	    } else if (counterFREQ == 3) {
+	        sprintf(bufferFREQ, "Frequency: 3 50KHz");
+	    } else if (counterFREQ == 4) {
+	        sprintf(bufferFREQ, "Frequency: 4 100KHz");
+	    }
+
+	    // Transmit the data over SPI
+	    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferConduct, strlen(bufferConduct), HAL_MAX_DELAY);
+	    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferMoist, strlen(bufferMoist), HAL_MAX_DELAY);
+	    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferDs18b20, strlen(bufferDs18b20), HAL_MAX_DELAY);
+	    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferConduct2, strlen(bufferConduct2), HAL_MAX_DELAY);
+
+	    if (HAL_GPIO_ReadPin(SET_1_GPIO_Port, SET_1_Pin) == 1) {
+	        HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferSET1, strlen(bufferSET1), HAL_MAX_DELAY);
+	    } else if (HAL_GPIO_ReadPin(SET_10_GPIO_Port, SET_10_Pin) == 1) {
+	        HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferSET10, strlen(bufferSET10), HAL_MAX_DELAY);
+	    } else if (HAL_GPIO_ReadPin(SET_100_GPIO_Port, SET_100_Pin) == 1) {
+	        HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferSET100, strlen(bufferSET100), HAL_MAX_DELAY);
+	    } else if (HAL_GPIO_ReadPin(SET_1000_GPIO_Port, SET_1000_Pin) == 1) {
+	        HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferSET1000, strlen(bufferSET1000), HAL_MAX_DELAY);
+	    }
+
+	    HAL_SPI_Transmit(&hspi1, (uint8_t*)bufferFREQ, strlen(bufferFREQ), HAL_MAX_DELAY);
+	}
+
+void conductonly(){
+	if((HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1)==1)&((SET1||SET10)||SET100||SET1000))
+	{
+		data_rdy=0;
+		counter2=0;
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+
+		if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1)==1){
+								av_cond=0;
+								conductivity=0;
+								resistance=0;
+								final_average_cond=0;
+								Temp=0;
+								Temp2=0;
+
+
+								ssd1306_Fill(0);
+								ssd1306_UpdateScreen();
+								ssd1306_SetCursor(0, 0);
+								ssd1306_WriteString("Measuring",Font_7x10,1);
+								ssd1306_SetCursor(0, 10);
+								ssd1306_WriteString("Resistance...",Font_7x10,1);
+								ssd1306_UpdateScreen();
+								ssd1306_Fill(0);
+								HAL_Delay(50);
+
+								ADC_CH1();
+								for(int i=0;i<50;i++)
+								{
+									PWM_COND();
+								}
+
+
+
+								float av_cond_sum = 0;
+
+								for(int j = 0; j < 10; j++) {
+
+									HAL_ADC_Start(&hadc2);
+									PWM_COND();
+									float av_cond = 0; // Initialize av_cond for each iteration
+
+									for(int i = 0; i < 10; i++) {
+
+										PWM_COND();
+										HAL_ADC_PollForConversion(&hadc2, 1);
+										adc_buffer[0] = HAL_ADC_GetValue(&hadc2);
+										voltage_buffer[0] = adc_value_to_voltage(adc_buffer[0]);
+										av_cond += voltage_buffer[0] / 10; // Accumulate the value
+
+									}
+
+									HAL_ADC_Stop(&hadc2);
+									HAL_Delay(10);
+
+									//						Set_Conductivity_outputs_PD();
+									//
+
+
+									// Add the average of this iteration to av_cond_sum
+									av_cond_sum += av_cond;
+								}
+
+
+								// Calculate the final average
+								final_average_cond = av_cond_sum / 10;
+								ssd1306_UpdateScreen();
+								ssd1306_SetCursor(0, 0);
+								ssd1306_WriteString("OK",Font_7x10,1);
+								ssd1306_UpdateScreen();
+								ssd1306_Fill(0);
+								HAL_Delay(100);
+
+								for(i=0;i<10;i++)
+								{
+									Temp=DS18B20_GetTemp();
+									Temp2+=Temp;
+									HAL_Delay(10);
+								}
+								Temp=Temp2/10;
+								ssd1306_UpdateScreen();
+								ssd1306_SetCursor(0, 0);
+								ssd1306_WriteString("Temp Measure",Font_7x10,1);
+								ssd1306_UpdateScreen();
+
+								ssd1306_Fill(0);
+								ssd1306_UpdateScreen();
+								ssd1306_SetCursor(5,20);
+								ssd1306_WriteString("Finished",Font_11x18,1);
+								ssd1306_UpdateScreen();
+								HAL_Delay(100);
+								if(SET1==1)
+								{
+									conductivity=new_calculateECSET1(final_average_cond,Temp);
+									resistance=new_calculateRSET1(final_average_cond);
+								}
+								if(SET10==1)
+								{
+									conductivity=new_calculateECSET10(final_average_cond,Temp);
+									resistance=new_calculateRSET10(final_average_cond);
+								}
+								if(SET100==1)
+								{
+									conductivity=new_calculateECSET100(final_average_cond,Temp);
+									resistance=new_calculateRSET100(final_average_cond);
+								}
+								if(SET1000==1)
+								{
+									conductivity=new_calculateECSET1000(final_average_cond,Temp);
+									resistance=new_calculateRSET1000(final_average_cond);
+								}
+								HAL_Delay(200);
+								EC_out_of_range_fast();
+			//					salinity_fertilizer();
+								ssd1306_Fill(0);
+								ssd1306_UpdateScreen();
+								data_rdy=1;
+
+							}
+
+		}
+}
 	void moistconduct(){
 		if((HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)&((SET1||SET10)||SET100||SET1000))
 		{
-
+			data_rdy=0;
 			counter2=0;
-			timeout=0;
-			while(timeout!=1)
-			{
-				ssd1306_Fill(0);
-				ssd1306_UpdateScreen();
-				ssd1306_SetCursor(0, 0);
-				ssd1306_WriteString("1.Probe in Air",Font_6x8,1);
-				ssd1306_SetCursor(0, 10);
-				ssd1306_WriteString("2.Add Distilled Water",Font_6x8,1);
-				ssd1306_SetCursor(0, 20);
-				ssd1306_WriteString("3.Mix Soil Sample",Font_6x8,1);
-				ssd1306_SetCursor(0, 30);
-				ssd1306_WriteString("4.Probe in Soil",Font_6x8,1);
-				ssd1306_SetCursor(0, 40);
-				ssd1306_WriteString("5.Press the Button",Font_6x8,1);
-				ssd1306_SetCursor(0, 50);
-				ssd1306_WriteString("5.Wait for the Results",Font_6x8,1);
-				ssd1306_UpdateScreen();
-				HAL_Delay(200);
-
-
-
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
 				if(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3)==1)
 				{
 
 					av_cond=0;
 					av_moist=0;
 					final_average_cond=0;
+					Temp=0;
+					Temp2=0;
 
 					ssd1306_Fill(0);
 					ssd1306_UpdateScreen();
@@ -1240,44 +1592,13 @@ float calculateECSET10(float voltage,float Temp) {
 					} else if (percentage_moist2 < 0) {
 						percentage_moist2 = 0;
 					}
-					if(percentage_moist2>=80)
-					{
-						ssd1306_Fill(0);
-						ssd1306_UpdateScreen();
-						ssd1306_SetCursor(0, 0);
-						ssd1306_WriteString("MOISTURE OK",Font_7x10,1);
-						ssd1306_SetCursor(0, 15);
-						ssd1306_WriteString("OVER 80%",Font_7x10,1);
-						ssd1306_UpdateScreen();
-						ssd1306_Fill(0);
-						HAL_Delay(5000);
-					}
-					else if(percentage_moist2<80)
-					{
-						ssd1306_Fill(0);
-						ssd1306_UpdateScreen();
-						ssd1306_SetCursor(0, 0);
-						ssd1306_WriteString("MOISTURE LOW",Font_7x10,1);
-						ssd1306_SetCursor(0, 15);
-						ssd1306_WriteString("UNDER 80%",Font_7x10,1);
-						ssd1306_SetCursor(0, 30);
-						ssd1306_WriteString("ADD DISTILLED",Font_7x10,1);
-						ssd1306_SetCursor(0, 45);
-						ssd1306_WriteString("WATER",Font_7x10,1);
-						ssd1306_UpdateScreen();
-						ssd1306_Fill(0);
-						HAL_Delay(5000);
-						timeout=0;
-						break;
-					}
-
 
 					ssd1306_Fill(0);
 					ssd1306_UpdateScreen();
 					ssd1306_SetCursor(0, 0);
 					ssd1306_WriteString("Measuring",Font_7x10,1);
 					ssd1306_SetCursor(0, 10);
-					ssd1306_WriteString("Conductivity...",Font_7x10,1);
+					ssd1306_WriteString("Resistance...",Font_7x10,1);
 					ssd1306_UpdateScreen();
 					ssd1306_Fill(0);
 					HAL_Delay(1000);
@@ -1322,109 +1643,106 @@ float calculateECSET10(float voltage,float Temp) {
 
 					// Calculate the final average
 					final_average_cond = av_cond_sum / 15;
+					ssd1306_UpdateScreen();
+					ssd1306_SetCursor(0, 0);
+					ssd1306_WriteString("Measuring",Font_7x10,1);
+					ssd1306_SetCursor(0, 10);
+					ssd1306_WriteString("Temperature...",Font_7x10,1);
+					ssd1306_UpdateScreen();
+					ssd1306_Fill(0);
+					HAL_Delay(1000);
 
 					for(i=0;i<10;i++)
 					{
 						Temp=DS18B20_GetTemp();
 						Temp2+=Temp;
-						HAL_Delay(100);
+						HAL_Delay(10);
 					}
 					Temp=Temp2/10;
 
 					ssd1306_Fill(0);
 					ssd1306_UpdateScreen();
-					ssd1306_SetCursor(0, 0);
-					ssd1306_WriteString("Conductivity+Temp ",Font_7x10,1);
-					ssd1306_SetCursor(0,10);
-					ssd1306_WriteString("measurement",Font_7x10,1);
-					ssd1306_SetCursor(0,20);
-					ssd1306_WriteString("finished",Font_7x10,1);
+					ssd1306_SetCursor(5,20);
+					ssd1306_WriteString("Finished",Font_11x18,1);
 					ssd1306_UpdateScreen();
-					HAL_Delay(4000);
+					HAL_Delay(1000);
 					if(SET1==1)
 					{
-						conductivity=calculateECSET1(final_average_cond,Temp);
+						conductivity=new_calculateECSET1(final_average_cond,Temp);
+						resistance=new_calculateRSET1(final_average_cond);
 					}
 					if(SET10==1)
 					{
-						conductivity=calculateECSET10(final_average_cond,Temp);
+						conductivity=new_calculateECSET10(final_average_cond,Temp);
+						resistance=new_calculateRSET10(final_average_cond);
 					}
 					if(SET100==1)
 					{
-						conductivity=calculateECSET100(final_average_cond,Temp);
+						conductivity=new_calculateECSET100(final_average_cond,Temp);
+						resistance=new_calculateRSET100(final_average_cond);
 					}
 					if(SET1000==1)
 					{
-						conductivity=calculateECSET1000(final_average_cond,Temp);
+						conductivity=new_calculateECSET1000(final_average_cond,Temp);
+						resistance=new_calculateRSET1000(final_average_cond);
 					}
-					HAL_Delay(4000);
+					HAL_Delay(200);
 					EC_out_of_range();
-					salinity_fertilizer();
-
-					timeout=0;
-					break;
-
+//					salinity_fertilizer();
+					ssd1306_Fill(0);
+					ssd1306_UpdateScreen();
+					data_rdy=1;
 				}
-			}
-			if(timeout==1)
-			{
-				ssd1306_Fill(0);
-				ssd1306_UpdateScreen();
-				ssd1306_SetCursor(0, 0);
-				ssd1306_WriteString("Timeout",Font_7x10,1);
-				ssd1306_SetCursor(0, 10);
-				ssd1306_WriteString("Triggered",Font_7x10,1);
-				ssd1306_UpdateScreen();
-				HAL_Delay(1000);
-				timeout=0;
-			}
+
+
 		}
 
 	}
 
 
-	/* USER CODE END PFP */
+/* USER CODE END PFP */
 
-	/* Private user code ---------------------------------------------------------*/
-	/* USER CODE BEGIN 0 */
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
 
-	/* USER CODE END 0 */
+/* USER CODE END 0 */
 
-	/**
-	 * @brief  The application entry point.
-	 * @retval int
-	 */
-	int main(void)
-	{
-		/* USER CODE BEGIN 1 */
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  /* USER CODE BEGIN 1 */
 
-		/* USER CODE END 1 */
+  /* USER CODE END 1 */
 
-		/* MCU Configuration--------------------------------------------------------*/
+  /* MCU Configuration--------------------------------------------------------*/
 
-		/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-		HAL_Init();
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-		/* USER CODE BEGIN Init */
+  /* USER CODE BEGIN Init */
 
-		/* USER CODE END Init */
+  /* USER CODE END Init */
 
-		/* Configure the system clock */
-		SystemClock_Config();
+  /* Configure the system clock */
+  SystemClock_Config();
 
-		/* USER CODE BEGIN SysInit */
+  /* USER CODE BEGIN SysInit */
 
-		/* USER CODE END SysInit */
+  /* USER CODE END SysInit */
 
-		/* Initialize all configured peripherals */
-		MX_GPIO_Init();
-		MX_I2C1_Init();
-		MX_ADC2_Init();
-		MX_TIM1_Init();
-		MX_TIM4_Init();
-		MX_TIM3_Init();
-		MX_TIM2_Init();
-		/* USER CODE BEGIN 2 */
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  MX_ADC2_Init();
+  MX_TIM1_Init();
+  MX_TIM4_Init();
+  MX_TIM3_Init();
+  MX_TIM2_Init();
+  MX_SPI1_Init();
+  /* USER CODE BEGIN 2 */
 		SSD1306_INITS();
 		HAL_ADC_Init(&hadc2);
 		HAL_TIM_Base_Start(&htim1);
@@ -1445,16 +1763,16 @@ float calculateECSET10(float voltage,float Temp) {
 
 
 
-		/* USER CODE END 2 */
+  /* USER CODE END 2 */
 
-		/* Infinite loop */
-		/* USER CODE BEGIN WHILE */
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
 		while (1)
 		{
 
 			Set_counterFREQ();
 			//MEASURE SEQUENTIAL
-
+			conductonly();
 			moistconduct();
 
 			//DS18B20
@@ -1474,453 +1792,512 @@ float calculateECSET10(float voltage,float Temp) {
 
 
 
-			if((SET1==1)||SET10==1){
-				ssd1306_SetCursor(0, 0);
-				sprintf(bufferConduct,"EC %.fmV %.3f mS/cm",final_average_cond,conductivity);
-				ssd1306_WriteString(bufferConduct,Font_6x8,1);
-			}
-			if((SET100==1)||SET1000==1){
-				ssd1306_SetCursor(0, 0);
-				sprintf(bufferConduct,"EC %.fmV %.2f uS/cm",final_average_cond,conductivity);
-				ssd1306_WriteString(bufferConduct,Font_6x8,1);
-			}
+			ssd1306_SetCursor(0, 0);
+			sprintf(bufferConduct,"R %.fmV %.f Ohm",final_average_cond,resistance);
+			ssd1306_WriteString(bufferConduct,Font_6x8,1);
 			ssd1306_SetCursor(0, 11);
 			sprintf(bufferMoist,"Moist %.1fV %.1f%%",av_moist_sum,percentage_moist2);
 			ssd1306_WriteString(bufferMoist,Font_6x8,1);
 			ssd1306_SetCursor(0, 21);
-			sprintf(bufferTemp,"Temp MCU %.2fV",voltage_buffer[2]);
-			ssd1306_WriteString(bufferTemp,Font_6x8,1);
-			ssd1306_SetCursor(0, 31);
 			sprintf(bufferDs18b20,"ds18b20 %.2fC",Temp);
 			ssd1306_WriteString(bufferDs18b20,Font_6x8,1);
+			if(SET1 == 1 || SET10 ==1){
+				ssd1306_SetCursor(0, 31);
+				sprintf(bufferConduct2,"EC %.3f mS/cm",conductivity);
+				ssd1306_WriteString(bufferConduct2,Font_6x8,1);
+			}else if(SET100==1 || SET1000==1){
+				ssd1306_SetCursor(0, 31);
+				sprintf(bufferConduct2,"EC %.3f uS/cm",conductivity);
+				ssd1306_WriteString(bufferConduct2,Font_6x8,1);
+			}
 
 			Set_SENSE();
 			Set_counterFREQ_ssd1306();
 			ssd1306_UpdateScreen();
+			if(data_rdy){
+
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+				HAL_Delay(200);
+				send_data();
+				HAL_Delay(200);
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+
+				data_rdy=0;
+			}
+			else{
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+				data_rdy=0;
+			}
 
 
 
-			/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-			/* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
 		}
-		/* USER CODE END 3 */
-	}
+  /* USER CODE END 3 */
+}
 
-	/**
-	 * @brief System Clock Configuration
-	 * @retval None
-	 */
-	void SystemClock_Config(void)
-	{
-		RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-		RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-		RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
-		/** Initializes the RCC Oscillators according to the specified parameters
-		 * in the RCC_OscInitTypeDef structure.
-		 */
-		RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-		RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-		RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-		RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-		RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-		RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-		RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-		if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-		{
-			Error_Handler();
-		}
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-		/** Initializes the CPU, AHB and APB buses clocks
-		 */
-		RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-				|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-		RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-		RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-		RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-		RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-		if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-		PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
-		if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-		{
-			Error_Handler();
-		}
-	}
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 
-	/**
-	 * @brief ADC2 Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_ADC2_Init(void)
-	{
+/**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
 
-		/* USER CODE BEGIN ADC2_Init 0 */
+  /* USER CODE BEGIN ADC2_Init 0 */
 
-		/* USER CODE END ADC2_Init 0 */
+  /* USER CODE END ADC2_Init 0 */
 
-		ADC_ChannelConfTypeDef sConfig = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
 
-		/* USER CODE BEGIN ADC2_Init 1 */
+  /* USER CODE BEGIN ADC2_Init 1 */
 
-		/* USER CODE END ADC2_Init 1 */
+  /* USER CODE END ADC2_Init 1 */
 
-		/** Common config
-		 */
-		hadc2.Instance = ADC2;
-		hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
-		hadc2.Init.ContinuousConvMode = DISABLE;
-		hadc2.Init.DiscontinuousConvMode = DISABLE;
-		hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-		hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-		hadc2.Init.NbrOfConversion = 1;
-		if (HAL_ADC_Init(&hadc2) != HAL_OK)
-		{
-			Error_Handler();
-		}
+  /** Common config
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc2.Init.NbrOfConversion = 1;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-		//  /** Configure Regular Channel
-		//  */
-		//  sConfig.Channel = ADC_CHANNEL_1;
-		//  sConfig.Rank = ADC_REGULAR_RANK_1;
-		//  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
-		//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
-		//  {
-		//    Error_Handler();
-		//  }
-		//
-		//  /** Configure Regular Channel
-		//  */
-		//  sConfig.Channel = ADC_CHANNEL_2;
-		//  sConfig.Rank = ADC_REGULAR_RANK_2;
-		//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
-		//  {
-		//    Error_Handler();
-		//  }
-		//
-		//  /** Configure Regular Channel
-		//  */
-		//  sConfig.Channel = ADC_CHANNEL_3;
-		//  sConfig.Rank = ADC_REGULAR_RANK_3;
-		//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
-		//  {
-		//    Error_Handler();
-		//  }
-		/* USER CODE BEGIN ADC2_Init 2 */
+//  /** Configure Regular Channel
+//  */
+//  sConfig.Channel = ADC_CHANNEL_1;
+//  sConfig.Rank = ADC_REGULAR_RANK_1;
+//  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+//
+//  /** Configure Regular Channel
+//  */
+//  sConfig.Channel = ADC_CHANNEL_2;
+//  sConfig.Rank = ADC_REGULAR_RANK_2;
+//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+//
+//  /** Configure Regular Channel
+//  */
+//  sConfig.Channel = ADC_CHANNEL_3;
+//  sConfig.Rank = ADC_REGULAR_RANK_3;
+//  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+  /* USER CODE BEGIN ADC2_Init 2 */
 
-		/* USER CODE END ADC2_Init 2 */
+  /* USER CODE END ADC2_Init 2 */
 
-	}
+}
 
-	/**
-	 * @brief I2C1 Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_I2C1_Init(void)
-	{
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
 
-		/* USER CODE BEGIN I2C1_Init 0 */
+  /* USER CODE BEGIN I2C1_Init 0 */
 
-		/* USER CODE END I2C1_Init 0 */
+  /* USER CODE END I2C1_Init 0 */
 
-		/* USER CODE BEGIN I2C1_Init 1 */
+  /* USER CODE BEGIN I2C1_Init 1 */
 
-		/* USER CODE END I2C1_Init 1 */
-		hi2c1.Instance = I2C1;
-		hi2c1.Init.ClockSpeed = 100000;
-		hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-		hi2c1.Init.OwnAddress1 = 0;
-		hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-		hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-		hi2c1.Init.OwnAddress2 = 0;
-		hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-		hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-		if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		/* USER CODE BEGIN I2C1_Init 2 */
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
 
-		/* USER CODE END I2C1_Init 2 */
+  /* USER CODE END I2C1_Init 2 */
 
-	}
+}
 
-	/**
-	 * @brief TIM1 Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_TIM1_Init(void)
-	{
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
 
-		/* USER CODE BEGIN TIM1_Init 0 */
+  /* USER CODE BEGIN SPI1_Init 0 */
 
-		/* USER CODE END TIM1_Init 0 */
+  /* USER CODE END SPI1_Init 0 */
 
-		TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-		TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE BEGIN SPI1_Init 1 */
 
-		/* USER CODE BEGIN TIM1_Init 1 */
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
 
-		/* USER CODE END TIM1_Init 1 */
-		htim1.Instance = TIM1;
-		htim1.Init.Prescaler = 72-1;
-		htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-		htim1.Init.Period = 0xffff-1;
-		htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-		htim1.Init.RepetitionCounter = 0;
-		htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-		if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-		if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-		sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-		if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		/* USER CODE BEGIN TIM1_Init 2 */
+  /* USER CODE END SPI1_Init 2 */
 
-		/* USER CODE END TIM1_Init 2 */
+}
 
-	}
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
 
-	/**
-	 * @brief TIM2 Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_TIM2_Init(void)
-	{
+  /* USER CODE BEGIN TIM1_Init 0 */
 
-		/* USER CODE BEGIN TIM2_Init 0 */
+  /* USER CODE END TIM1_Init 0 */
 
-		/* USER CODE END TIM2_Init 0 */
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-		TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-		TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE BEGIN TIM1_Init 1 */
 
-		/* USER CODE BEGIN TIM2_Init 1 */
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 72-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 0xffff-1;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
 
-		/* USER CODE END TIM2_Init 1 */
-		htim2.Instance = TIM2;
-		htim2.Init.Prescaler = 72-1;
-		htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-		htim2.Init.Period = 65535-1;
-		htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-		htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-		if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-		if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-		sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-		if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		/* USER CODE BEGIN TIM2_Init 2 */
+  /* USER CODE END TIM1_Init 2 */
 
-		/* USER CODE END TIM2_Init 2 */
+}
 
-	}
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
 
-	/**
-	 * @brief TIM3 Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_TIM3_Init(void)
-	{
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-		/* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE END TIM2_Init 0 */
 
-		/* USER CODE END TIM3_Init 0 */
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-		TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-		TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE BEGIN TIM2_Init 1 */
 
-		/* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 72-1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 65535-1;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-		/* USER CODE END TIM3_Init 1 */
-		htim3.Instance = TIM3;
-		htim3.Init.Prescaler = 7199;
-		htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-		htim3.Init.Period = 10;
-		htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-		htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-		if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-		if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-		sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-		if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		/* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE END TIM2_Init 2 */
 
-		/* USER CODE END TIM3_Init 2 */
+}
 
-	}
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
 
-	/**
-	 * @brief TIM4 Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_TIM4_Init(void)
-	{
+  /* USER CODE BEGIN TIM3_Init 0 */
 
-		/* USER CODE BEGIN TIM4_Init 0 */
+  /* USER CODE END TIM3_Init 0 */
 
-		/* USER CODE END TIM4_Init 0 */
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-		TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-		TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE BEGIN TIM3_Init 1 */
 
-		/* USER CODE BEGIN TIM4_Init 1 */
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 7199;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 10;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
 
-		/* USER CODE END TIM4_Init 1 */
-		htim4.Instance = TIM4;
-		htim4.Init.Prescaler = 47999;
-		htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-		htim4.Init.Period = 255;
-		htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-		htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-		if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-		if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-		sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-		if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-		{
-			Error_Handler();
-		}
-		/* USER CODE BEGIN TIM4_Init 2 */
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 47999;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 255;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
 		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 		HAL_Delay(100); // Introduce a delay (adjust as needed)
 		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-		/* USER CODE END TIM4_Init 2 */
+  /* USER CODE END TIM4_Init 2 */
 
-	}
+}
 
-	/**
-	 * @brief GPIO Initialization Function
-	 * @param None
-	 * @retval None
-	 */
-	static void MX_GPIO_Init(void)
-	{
-		GPIO_InitTypeDef GPIO_InitStruct = {0};
-		/* USER CODE BEGIN MX_GPIO_Init_1 */
-		/* USER CODE END MX_GPIO_Init_1 */
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
-		/* GPIO Ports Clock Enable */
-		__HAL_RCC_GPIOD_CLK_ENABLE();
-		__HAL_RCC_GPIOC_CLK_ENABLE();
-		__HAL_RCC_GPIOA_CLK_ENABLE();
-		__HAL_RCC_GPIOB_CLK_ENABLE();
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
-		/*Configure GPIO pin Output Level */
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11|GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
-		/*Configure GPIO pins : PC2 PC3 SET_1_Pin */
-		GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3|SET_1_Pin;
-		GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-		GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-		HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  /*Configure GPIO pins : PC1 PC2 PC3 SET_1_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|SET_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-		/*Configure GPIO pins : SET_1000_Pin SET_100_Pin SET_10_Pin */
-		GPIO_InitStruct.Pin = SET_1000_Pin|SET_100_Pin|SET_10_Pin;
-		GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-		GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /*Configure GPIO pins : SET_1000_Pin SET_100_Pin SET_10_Pin */
+  GPIO_InitStruct.Pin = SET_1000_Pin|SET_100_Pin|SET_10_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-		/*Configure GPIO pin : PB3 */
-		GPIO_InitStruct.Pin = GPIO_PIN_3;
-		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-		GPIO_InitStruct.Pull = GPIO_NOPULL;
-		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /*Configure GPIO pin : PB11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-		/*Configure GPIO pins : PB6 PB7 */
-		GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
-		GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-		GPIO_InitStruct.Pull = GPIO_NOPULL;
-		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /*Configure GPIO pin : PB3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-		/* USER CODE BEGIN MX_GPIO_Init_2 */
+  /*Configure GPIO pins : PB6 PB7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+/* USER CODE BEGIN MX_GPIO_Init_2 */
 		GPIO_InitStruct.Pin = GPIO_PIN_3;
 		GPIO_InitStruct.Mode = GPIO_MODE_AF_PP; // Alternate function push-pull
 		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-		/* USER CODE END MX_GPIO_Init_2 */
-	}
 
-	/* USER CODE BEGIN 4 */
+/* USER CODE END MX_GPIO_Init_2 */
+}
 
-	/* USER CODE END 4 */
+/* USER CODE BEGIN 4 */
 
-	/**
-	 * @brief  This function is executed in case of error occurrence.
-	 * @retval None
-	 */
-	void Error_Handler(void)
-	{
-		/* USER CODE BEGIN Error_Handler_Debug */
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
 		/* User can add his own implementation to report the HAL error return state */
 		__disable_irq();
 		while (1)
 		{
 		}
-		/* USER CODE END Error_Handler_Debug */
-	}
+  /* USER CODE END Error_Handler_Debug */
+}
 
 #ifdef  USE_FULL_ASSERT
-	/**
-	 * @brief  Reports the name of the source file and the source line number
-	 *         where the assert_param error has occurred.
-	 * @param  file: pointer to the source file name
-	 * @param  line: assert_param error line source number
-	 * @retval None
-	 */
-	void assert_failed(uint8_t *file, uint32_t line)
-	{
-		/* USER CODE BEGIN 6 */
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
 		/* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-		/* USER CODE END 6 */
-	}
+  /* USER CODE END 6 */
+}
 #endif /* USE_FULL_ASSERT */
